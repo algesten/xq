@@ -58,16 +58,16 @@ module.exports = class Pur
             @_prev?._removeNext this
             @_forward v, false
         else
-            unless @_resolver
-                @_setValue v, isError
-                @_forward v, isError
-            else
-                try
-                    @_resolver this, @_f, @_args, v, isError
-                catch err
-                    @_setError err
-                    @_forward err, true
+            try
+                unless @_resolver this, @_f, @_args, v, isError
+                    @_setValue v, isError
+                    @_forward v, isError
+            catch err
+                @_setError err
+                @_forward err, true
         this
+
+    _resolver: -> false
 
     _setValue: (v, isError) ->
         @_isError = !!isError
@@ -78,8 +78,8 @@ module.exports = class Pur
         @_value = e
 
     _forward: (v, isError) ->
+#        console.log "#{@cnt}", '_forward', @_next.length, v
         return if v == INI or !@_next.length
-#        console.log "#{@cnt}", '_forward', v
         if @_next.length
             @_next.forEach (n) -> n._exec v, isError
         else
@@ -98,6 +98,10 @@ module.exports = class Pur
         @_next.splice i, 1 if i = @_next.indexOf(n) >= 0
         this
 
+    val: ->
+        return undefined if @_value in [FIN, INI]
+        return @_value
+
 
 stepWith = (resolver) -> (_args...) ->
     p = new Pur(INI)
@@ -114,11 +118,13 @@ stepWithF = (resolver) -> (_f, _args...) ->
 
 # invoke f with args prepended to v
 invokeWithArgs = (f, args, v) ->
-    if args and args.length then f.apply this, args.concat(v) else f.call this, v
+    if args and args.length then f.apply this, args.concat([v]) else f.call this, v
 
-thenResolver   = (s, f, args, v, isError) ->
-    return s._forward v, isError if isError
-#    console.log "#{s.cnt}", '_thenResolve', f+ ''
+# value to indicate .always step
+ALWAYS = {always:true}
+
+stepResolver = (mode) -> (s, f, args, v, isError) ->
+    return false unless mode == ALWAYS or mode == isError
     r = invokeWithArgs f, args, v
     if r instanceof Pur
         r.then (x) ->
@@ -132,15 +138,17 @@ thenResolver   = (s, f, args, v, isError) ->
     else
         s._setValue r
         s._forward r, false
-    return s
+    return true
 
-failResolver   = (s, f, args, v, isError) ->
-    return s._forward v, isError unless isError
-#    console.log "#{s.cnt}", '_failResolve'
-alwaysResolver = (s, f, args, v, isError) ->
+thenResolver   = stepResolver(false)
+failResolver   = stepResolver(true)
+alwaysResolver = stepResolver(ALWAYS)
 allResolver    = (s, f, args, v, isError) ->
+    return false
 spreadResolver = (s, f, args, v, isError) ->
-valResolver    = (s, f, args, v, isError) ->
+    v2 = args.concat v
+    f2 = -> f.apply this, v2
+    return thenResolver s, f2, null, null, v2, isError
 
 StepFun = {
     then:   stepWithF(thenResolver)
@@ -148,7 +156,6 @@ StepFun = {
     always: stepWithF(alwaysResolver)
     all:    stepWith(allResolver)
     spread: stepWithF(spreadResolver)
-    val:    stepWith(valResolver)
 }
 
 Pur::[k] = v for k, v of StepFun

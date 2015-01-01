@@ -15,7 +15,7 @@ p.then/map(fx, a1, a2, ...)(x)
 p.fail/catch(fe, a1, a2, ...)(e)
 p.always/finally/fin(f, a1, a2, ...)(x or e)
 p.all([] or {})
-p.spread(fx) // for both [] and {}
+p.spread(fx)
 p.val()
 
 p.serial()

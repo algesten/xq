@@ -115,3 +115,117 @@ describe 'Pur', ->
                 v.should.eql panda:42
                 done()
             later -> def.resolve 42
+
+        it 'can handle repeated events through chain', (done) ->
+
+            def = Pur.defer()
+            n = 0
+            def.pur.then (v) ->
+                v.should.eql 42 + n++
+                done() if n == 2
+            def.push 42
+            def.push 43
+
+        it 'does not get repeated events when def is ended', (done) ->
+
+            def = Pur.defer()
+            n = 0
+            def.pur.then (v) ->
+                v.should.eql 42
+                done()
+            def.push 42
+            def.end()
+            def.push 43
+
+        it 'will not get event for resolved', (done) ->
+
+            def = Pur.defer()
+            n = 0
+            def.pur.then (v) ->
+                v.should.eql 42
+                done()
+            def.resolve(42)
+            def.push 43
+
+    describe '.fail', ->
+
+        it 'is invoked for simple rejected', (done) ->
+
+            Pur.reject(42).fail (v) ->
+                v.should.eql 42
+                done()
+
+        it 'is not invoked for non rejected', (done) ->
+
+            Pur(42).then (v) ->
+                v.should.eql 42
+                done()
+            .fail (v) ->
+                done('bad')
+
+        it 'is invoked if chained after .then', (done) ->
+
+            Pur.reject(42).then ->
+                done('bad')
+            .fail (v) ->
+                v.should.eql 42
+                done()
+
+        it 'invokes following then if no error', (done) ->
+
+            Pur.reject(42).fail (v) ->
+                v
+            .then (v) ->
+                v.should.eql 42
+                done()
+
+        it 'doesnt invoke any following fail if no error', (done) ->
+
+            Pur.reject(42).fail (v) ->
+                v
+            .fail (v) ->
+                done('bad')
+            .then (v) ->
+                v.should.eql 42
+                done()
+
+        it 'invokes fail for errors thrown in then', (done) ->
+
+            Pur(42).then (v) ->
+                throw 'failed'
+            .then (v) ->
+                done('bad')
+            .fail (err) ->
+                err.should.eql 'failed'
+                done()
+
+        it 'can handle repeated errors through chain', (done) ->
+
+            def = Pur.defer()
+            n = 0
+            def.pur.fail (v) ->
+                v.should.eql 42 + n++
+                done() if n == 2
+            def.pushError 42
+            def.pushError 43
+
+        it 'does not get repeated errors when def is ended', (done) ->
+
+            def = Pur.defer()
+            n = 0
+            def.pur.fail (v) ->
+                v.should.eql 42
+                done()
+            def.pushError 42
+            def.end()
+            def.pushError 43
+
+        it 'will not get errors for resolved', (done) ->
+
+            def = Pur.defer()
+            n = 0
+            def.pur.fail (v) ->
+                v.should.eql 42
+                done()
+            def.reject(42)
+            def.pushError 43
