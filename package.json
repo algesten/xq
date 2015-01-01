@@ -4,7 +4,8 @@
   "description": "Purist reactive promises",
   "main": "index.js",
   "scripts": {
-    "test": "mocha"
+    "test": "mocha",
+    "prepublish": "coffee -c -o lib src/pur.coffee"
   },
   "repository": {
     "type": "git",
