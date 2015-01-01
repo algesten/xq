@@ -11,9 +11,17 @@ class Defer
         @pur = null
 
     push:   (v) ->
-        @pur._exec v, false
+        try
+            @pur._exec v, false
+        catch err
+            throw err.wrap if err instanceof BubbleWrap
+            throw err
     pushError: (e) ->
-        @pur._exec e, true
+        try
+            @pur._exec e, true
+        catch err
+            throw err.wrap if err instanceof BubbleWrap
+            throw err
     resolve: (v) ->
         @push v
         @end()
@@ -66,7 +74,12 @@ module.exports = class Pur
                 unless @_resolver this, @_f, @_args, v, isError
                     @_setValue v, isError
             catch err
-                throw err.wrap if err instanceof BubbleWrap
+                if err instanceof BubbleWrap
+                    if @_defer
+                        throw err
+                    else
+                        # For .reject(42).done()
+                        throw err.wrap
                 @_setValue err, true
         this
 
@@ -111,9 +124,8 @@ module.exports = class Pur
         return undefined
 
 class BubbleWrap extends Error
-    constructor: (@wrap) ->
-        super
-        @message = 'BubbleWrap'
+    constructor: (@wrap) -> super
+    message: 'BubbleWrap'
 
 stepWith = (resolver) -> (_args...) ->
     p = new Pur(INI)
@@ -131,6 +143,9 @@ stepWithF = (resolver) -> (_args..., _f) ->
 # value to indicate .always step
 ALWAYS = {always:true}
 
+# token to stop nested resolves
+STOP = {stop:true}
+
 stepResolver = (mode) -> (s, f, args, v, isError) ->
     return false unless mode == ALWAYS or mode == isError
     # array passed to concat is unwrapped
@@ -143,7 +158,9 @@ stepResolver = (mode) -> (s, f, args, v, isError) ->
         if val instanceof Pur
             val.always (x, isResolvedErr) ->
                 waitFor x, isResolvedErr
-                null
+                STOP
+        else if val == STOP
+            # do nothing with this
         else
             s._setValue val, isError
     )(r, false)
@@ -160,7 +177,7 @@ spreadResolver = (s, f, args, v, isError) ->
     # [1,2].concat(3)     => [1,2,3]
     v2 = (args || []).concat v
     f2 = -> f.apply this, v2
-    return thenResolver s, f2, null, v2, isError
+    return thenResolver s, f2, undefined, v2, isError
 
 StepFun = {
     then:   stepWithF(thenResolver)

@@ -90,6 +90,18 @@ describe 'Pur', ->
 
             expect(-> Pur(42).then (v) -> Pur.bubble('fail')).to.throw 'fail'
 
+        it 'is different for defers with later done', ->
+
+            def = Pur.defer()
+            expect(->def.reject('fail')).to.not.throw 'fail'
+            expect(->def.pur.done()).to.throw 'fail'
+
+        it 'is different for defers with done then rejected', ->
+
+            def = Pur.defer()
+            expect(->def.pur.done()).to.not.throw 'fail'
+            expect(->def.reject('fail')).to.throw 'fail'
+
     describe '.then', ->
 
         it 'handles simple values', (done) ->
@@ -159,8 +171,26 @@ describe 'Pur', ->
             def2.push def3.pur
             def.push def3.pur.then (v) ->
                 defnew = Pur.defer()
-#                later -> defnew.resolve v + 100
-                defnew.resolve v + 100
+                later -> defnew.resolve v + 100
+                defnew.pur
+            .done()
+            def3.push 42
+            def3.push 43
+
+        it 'handles deferred in fails in deferreds created on the fly', (done) ->
+
+            def = Pur.defer()
+            n = 0
+            def.pur.fail (v) ->
+                v.should.eql 142 + n++
+                done() if n == 2
+            .done()
+            def2 = Pur.defer()
+            def3 = Pur.defer()
+            def2.push def3.pur
+            def.push def3.pur.then (v) ->
+                defnew = Pur.defer()
+                later -> defnew.reject v + 100
                 defnew.pur
             .done()
             def3.push 42
