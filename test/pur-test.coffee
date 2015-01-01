@@ -49,6 +49,18 @@ describe 'Pur', ->
             def = Pur.defer()
             def.pur.isEnded().should.eql false
 
+    describe 'errors', ->
+
+        it 'are silently consumed unless chain is .done', ->
+
+            expect(-> Pur.reject('fail')).to.not.throw 'fail'
+            expect(-> Pur.reject('fail').done()).to.throw 'fail'
+
+        it 'can also be made known by using Pur.bubble()', ->
+
+            expect(-> Pur(42).then (v) -> Pur.bubble('fail')).to.throw 'fail'
+
+
     describe '.then', ->
 
         it 'handles simple values', (done) ->
@@ -229,3 +241,17 @@ describe 'Pur', ->
                 done()
             def.reject(42)
             def.pushError 43
+
+    describe '.always', ->
+
+        it 'is invoked for normal values', (done) ->
+
+            Pur(42).always (v) ->
+                v.should.eql 42
+                done()
+
+        it 'is invoked for errors', (done) ->
+
+            Pur.reject(42).always (v) ->
+                v.should.eql 42
+                done()

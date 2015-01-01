@@ -47,6 +47,7 @@ module.exports = class Pur
     @Defer: Defer
     @reject: (error) -> new Pur(error, true)
     @defer:  (value) -> (new Pur(INI, false, new Defer()))._defer
+    @bubble: (err)   -> throw new BubbleError(err)
 
     isEnded: -> @_isEnded
 
@@ -63,6 +64,7 @@ module.exports = class Pur
                     @_setValue v, isError
                     @_forward v, isError
             catch err
+                throw err.wrap if err instanceof BubbleError
                 @_setError err
                 @_forward err, true
         this
@@ -78,12 +80,9 @@ module.exports = class Pur
         @_value = e
 
     _forward: (v, isError) ->
-#        console.log "#{@cnt}", '_forward', @_next.length, v
-        return if v == INI or !@_next.length
-        if @_next.length
-            @_next.forEach (n) -> n._exec v, isError
-        else
-            throw v if isError
+        return if v == INI
+#        console.log "#{@cnt}", '_forward', @_next.length, v, isError
+        @_next.forEach (n) -> n._exec v, isError
         this
 
     _addNext: (n) ->
@@ -91,7 +90,7 @@ module.exports = class Pur
         @_next.push n
         n._prev = this
         n._exec @_value, @_isError unless @_value == INI
-        n
+        return n
 
     _removeNext: (n) ->
         delete n._prev
@@ -102,6 +101,16 @@ module.exports = class Pur
         return undefined if @_value in [FIN, INI]
         return @_value
 
+    done: ->
+        p = new Pur()
+        p._resolver = (s, f, args, v, isError) ->
+            Pur.bubble(v) if isError
+            return true
+        @_addNext p
+        return undefined
+
+class BubbleError extends Error
+    constructor: (@wrap) -> super
 
 stepWith = (resolver) -> (_args...) ->
     p = new Pur(INI)
