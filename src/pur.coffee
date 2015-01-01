@@ -134,10 +134,10 @@ stepWithF = (resolver) -> (_args..., _f) ->
     return @_addNext p
 
 # value to indicate .always step
-ALWAYS = {always:true}
+ALWAYS = {}
 
 # token to stop nested resolves
-STOP = {stop:true}
+STOP = {}
 
 stepResolver = (mode) -> (s, f, args, v, isError) ->
     return false unless mode == ALWAYS or mode == isError
