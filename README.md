@@ -1,0 +1,4 @@
+Pur
+---
+
+Purist reactive promises
