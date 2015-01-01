@@ -10,17 +10,17 @@ class Defer
     constructor: ->
         @pur = null
 
-    push:   (v) =>
+    push:   (v) ->
         @pur._exec v, false
-    pushError: (e) =>
+    pushError: (e) ->
         @pur._exec e, true
-    resolve: (v) =>
+    resolve: (v) ->
         @push v
         @end()
-    reject: (e) =>
+    reject: (e) ->
         @pushError e
         @end()
-    end: =>
+    end: ->
         @pur._exec FIN, false
 
 cnt = 0
@@ -168,3 +168,9 @@ StepFun = {
 }
 
 Pur::[k] = v for k, v of StepFun
+
+# Some alias
+
+Pur::map = Pur::then
+Pur::catch = Pur::fail
+Pur::finally = Pur::fin = Pur::always
