@@ -31,14 +31,10 @@ class Defer
     end: ->
         @pur._exec FIN, false
 
-cnt = 0
-
 module.exports = class Pur
 
     constructor: (@_value, @_isError, @_defer) ->
         return new Pur(_value, false) unless this instanceof Pur
-
-        @cnt = cnt++
 
         # root Pur does simple resolving
         @_f        = (x) -> x
@@ -47,7 +43,7 @@ module.exports = class Pur
         @_prev      = null
         @_next      = []
         @_defer.pur = this if @_defer
-        @_isEnded   = !@_defer
+        @_isEnded   = _value != INI and !@_defer
 
         # construct with (Pur) is the same as .then
         if _value instanceof Pur
@@ -64,11 +60,11 @@ module.exports = class Pur
     isEnded: -> @_isEnded
 
     _exec: (v, isError) ->
-#        console.log "#{@cnt}", '_exec', v
+        return if @_isEnded and @_value != INI
         if v == FIN
             @_prev?._removeNext this
             @_isEnded = true
-            @_setValue FIN, isError
+            @_forward FIN, isError
         else
             try
                 unless @_resolver this, @_f, @_args, v, isError
@@ -86,19 +82,17 @@ module.exports = class Pur
     _resolver: -> false
 
     _setValue: (v, isError) ->
-        unless @_isEnded and @_value != INI
-            @_isError = isError
-            @_value = v
+        return if @_isEnded and @_value != INI
+        @_isError = isError
+        @_value = v
         @_forward v, isError
 
     _forward: (v, isError) ->
         return if v == INI
-#        console.log "#{@cnt}", '_forward', @_next.length, v, isError
         @_next.forEach (n) -> n._exec v, isError
         this
 
     _addNext: (n) ->
-#        console.log "#{@cnt}", '_addNext'
         @_next.push n
         n._prev = this
         unless @_value == INI
@@ -116,7 +110,7 @@ module.exports = class Pur
         return @_value
 
     done: ->
-        p = new Pur()
+        p = new Pur(INI)
         p._resolver = (s, f, args, v, isError) ->
             Pur.bubble(v) if isError
             return true
@@ -125,7 +119,6 @@ module.exports = class Pur
 
 class BubbleWrap extends Error
     constructor: (@wrap) -> super
-    message: 'BubbleWrap'
 
 stepWith = (resolver) -> (_args...) ->
     p = new Pur(INI)
@@ -162,6 +155,7 @@ stepResolver = (mode) -> (s, f, args, v, isError) ->
         else if val == STOP
             # do nothing with this
         else
+            # also undefined goes here
             s._setValue val, isError
     )(r, false)
     return true

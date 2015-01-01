@@ -263,6 +263,7 @@ describe 'Pur', ->
             def.pur.then (v) ->
                 v.should.eql 42 + n++
                 done() if n == 2
+            .done()
             def.push 42
             def.push 43
 
@@ -305,7 +306,7 @@ describe 'Pur', ->
                 done()
             .done()
 
-it 'is aliased to map', ->
+        it 'is aliased to map', ->
 
             Pur::then.should.equal Pur::map
 
