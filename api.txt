@@ -11,11 +11,11 @@ p = def.pur
 
 p.isEnded()
 
-p.then/map(fx, a1, a2, ...)(x)
-p.fail/catch(fe, a1, a2, ...)(e)
-p.always/finally/fin(f, a1, a2, ...)(x or e)
+p.then/map(a1, a2, ..., fx)(x)
+p.fail/catch(a1, a2, ..., fx)(e)
+p.always/finally/fin(a1, a2, ..., f, isError)(x or e)
 p.all([] or {})
-p.spread(fx)
+p.spread(a1, a2, ..., fx)
 p.val()
 
 p.serial()

@@ -17,12 +17,42 @@ describe 'Pur', ->
             px = Pur(x = 42)
             px.isEnded().should.be.true
 
+        it 'is also ok with nothing', (done) ->
+
+            px = Pur()
+            px.isEnded().should.be.true
+            px.then done
+
+        it 'nested 2 levels are fine', (done) ->
+
+            px = Pur(Pur(42))
+            px.isEnded().should.be.true
+            px.then (v) ->
+                v.should.eql 42
+                done()
+            .done()
+
+        it 'nested 3 levels are fine', (done) ->
+
+            px = Pur(Pur(Pur(42)))
+            px.isEnded().should.be.true
+            px.then (v) ->
+                v.should.eql 42
+                done()
+            .done()
+
     describe 'error instantiation', ->
 
         it 'is done Pur.reject(e)', ->
 
             pe = Pur.reject(e = new Error('wrong'))
             pe.isEnded().should.be.true
+
+        it 'is ok with nothing', (done) ->
+
+            pe = Pur.reject()
+            pe.isEnded().should.be.true
+            pe.fail done
 
     describe 'defer instantiation', ->
 
@@ -60,7 +90,6 @@ describe 'Pur', ->
 
             expect(-> Pur(42).then (v) -> Pur.bubble('fail')).to.throw 'fail'
 
-
     describe '.then', ->
 
         it 'handles simple values', (done) ->
@@ -77,6 +106,75 @@ describe 'Pur', ->
                 done()
             def.push 42
 
+        it 'handles then connected after deferred push', (done) ->
+
+            def = Pur.defer()
+            def.push 42
+            def.pur.then (v) ->
+                v.should.eql 42
+                done()
+
+        it 'handles then connected after deferred resolve', (done) ->
+
+            def = Pur.defer()
+            def.resolve 42
+            def.pur.then (v) ->
+                v.should.eql 42
+                done()
+
+        it 'handles deferred in deferreds', (done) ->
+
+            def = Pur.defer()
+            def.pur.then (v) ->
+                v.should.eql 42
+                done()
+            def2 = Pur.defer()
+            def.push def2.pur
+            def2.push 42
+
+        it 'handles deferred in deferreds in deferreds', (done) ->
+
+            def = Pur.defer()
+            n = 0
+            def.pur.then (v) ->
+                v.should.eql 42 + n++
+                done() if n == 2
+            def2 = Pur.defer()
+            def3 = Pur.defer()
+            def2.push def3.pur
+            def.push def2.pur
+            def3.push 42
+            def3.push 43
+
+        it 'handles deferred in deferreds in deferreds created on the fly', (done) ->
+
+            def = Pur.defer()
+            n = 0
+            def.pur.then (v) ->
+                v.should.eql 142 + n++
+                done() if n == 2
+            .done()
+            def2 = Pur.defer()
+            def3 = Pur.defer()
+            def2.push def3.pur
+            def.push def3.pur.then (v) ->
+                defnew = Pur.defer()
+#                later -> defnew.resolve v + 100
+                defnew.resolve v + 100
+                defnew.pur
+            .done()
+            def3.push 42
+            def3.push 43
+
+        it 'resolves pushed deferreds', (done) ->
+
+            def = Pur.defer()
+            def.pur.then (v) ->
+                v.should.eql 42
+                done()
+            .done()
+            def.push Pur(42)
+
         it 'resolves already pushed value', (done) ->
 
             def = Pur.defer()
@@ -85,7 +183,7 @@ describe 'Pur', ->
                 v.should.eql 42
                 done()
 
-        it 'handles simple transformative chains', (done) ->
+        it 'handles simple transforming chains', (done) ->
 
             Pur(42).then (v) ->
                 v.should.eql 42
@@ -94,7 +192,7 @@ describe 'Pur', ->
                 v.should.eql panda:true
                 done()
 
-        it 'handles transformative chains with deferred', (done) ->
+        it 'handles transforming chains with deferred', (done) ->
 
             Pur(42).then (v) ->
                 v.should.eql 42
@@ -103,7 +201,7 @@ describe 'Pur', ->
                 v.should.eql panda:true
                 done()
 
-        it 'handles transformative chains with later deferred', (done) ->
+        it 'handles transforming chains with later deferred', (done) ->
 
             Pur(42).then (v) ->
                 v.should.eql 42
@@ -117,7 +215,7 @@ describe 'Pur', ->
                 v.should.eql panda:42
                 done()
 
-        it 'can do transformative chains with root deferred', (done) ->
+        it 'can do transforming chains with root deferred', (done) ->
 
             def = Pur.defer()
             def.pur.then (v) ->
@@ -158,6 +256,28 @@ describe 'Pur', ->
                 done()
             def.resolve(42)
             def.push 43
+
+        it 'can be bound with arguments', (done) ->
+
+            Pur(42).then 1, 2, (a0, a1, a2) ->
+                a0.should.eql 1
+                a1.should.eql 2
+                a2.should.eql 42
+                done()
+            .done()
+
+        it 'can be bound with arguments and still receive an array', (done) ->
+
+            Pur([42]).then 1, 2, (a0, a1, a2) ->
+                a0.should.eql 1
+                a1.should.eql 2
+                a2.should.eql [42]
+                done()
+            .done()
+
+it 'is aliased to map', ->
+
+            Pur::then.should.equal Pur::map
 
     describe '.fail', ->
 
@@ -242,16 +362,113 @@ describe 'Pur', ->
             def.reject(42)
             def.pushError 43
 
+        it 'can be bound with arguments', (done) ->
+
+            Pur.reject(42).fail 1, 2, (a0, a1, a2) ->
+                a0.should.eql 1
+                a1.should.eql 2
+                a2.should.eql 42
+                done()
+            .done()
+
+        it 'is aliased to catch', ->
+
+            Pur::fail.should.equal Pur::catch
+
     describe '.always', ->
 
         it 'is invoked for normal values', (done) ->
 
-            Pur(42).always (v) ->
+            Pur(42).always (v, isError) ->
                 v.should.eql 42
+                isError.should.be.false
                 done()
+            .done()
 
         it 'is invoked for errors', (done) ->
 
+            Pur.reject(42).always (v, isError) ->
+                v.should.eql 42
+                isError.should.be.true
+                done()
+            .done()
+
+        it 'becomes normal values after in chain', (done) ->
+
             Pur.reject(42).always (v) ->
                 v.should.eql 42
+                v
+            .fail ->
+                done('bad')
+            .then (v) ->
+                v.should.eql 42
                 done()
+
+        it 'can be event fed both values and errors', (done) ->
+
+            def = Pur.defer()
+            n = 0
+            def.pur.always (v) ->
+                v.should.eql 42 + n++
+                done() if n == 2
+            .done()
+            def.pushError 42
+            def.push 43
+
+        it 'can be bound with arguments when value', (done) ->
+
+            Pur(42).always 1, 2, (a0, a1, a2) ->
+                a0.should.eql 1
+                a1.should.eql 2
+                a2.should.eql 42
+                done()
+            .done()
+
+        it 'can be bound with arguments when error', (done) ->
+
+            Pur.reject(42).always 1, 2, (a0, a1, a2) ->
+                a0.should.eql 1
+                a1.should.eql 2
+                a2.should.eql 42
+                done()
+            .done()
+
+        it 'is aliased to fin and finally', ->
+
+            Pur::always.should.equal Pur::fin
+            Pur::always.should.equal Pur::finally
+
+    describe '.spread', ->
+
+        it 'unpacks any incoming array to function arguments', (done) ->
+
+            Pur([1,2]).spread (a0, a1) ->
+                a0.should.eql 1
+                a1.should.eql 2
+                done()
+            .done()
+
+        it 'handles single values', (done) ->
+
+            Pur(42).spread (a0, a1) ->
+                a0.should.eql 42
+                expect(a1).to.be.undefined
+                done()
+            .done()
+
+        it 'can be bound for single values', (done) ->
+
+            Pur(42).spread 1, (a0, a1) ->
+                a0.should.eql 1
+                a1.should.eql 42
+                done()
+            .done()
+
+        it 'can be bound for arrays', (done) ->
+
+            Pur([42,43]).spread 1, (a0, a1, a2) ->
+                a0.should.eql 1
+                a1.should.eql 42
+                a2.should.eql 43
+                done()
+            .done()

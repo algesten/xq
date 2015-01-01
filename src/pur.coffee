@@ -32,52 +32,51 @@ module.exports = class Pur
 
         @cnt = cnt++
 
-        # construct with (Pur, resolver)
-        if _value instanceof Pur
-            @_prev     = @_value
-            @_resolver = @_isError
-            @_setValue undefined
+        # root Pur does simple resolving
+        @_f        = (x) -> x
+        @_resolver = thenResolver
 
         @_prev      = null
         @_next      = []
-        @_isEnded   = false
         @_defer.pur = this if @_defer
-        @_isEnded   = true unless @_defer
+        @_isEnded   = !@_defer
+
+        # construct with (Pur) is the same as .then
+        if _value instanceof Pur
+            @_prev     = @_value
+            @_value    = INI
+            @_isError  = false
+            @_prev._addNext this # this may reset _value
 
     @Defer: Defer
     @reject: (error) -> new Pur(error, true)
     @defer:  (value) -> (new Pur(INI, false, new Defer()))._defer
-    @bubble: (err)   -> throw new BubbleError(err)
+    @bubble: (err)   -> throw new BubbleWrap(err)
 
     isEnded: -> @_isEnded
 
     _exec: (v, isError) ->
-        return if @_value == FIN
 #        console.log "#{@cnt}", '_exec', v
         if v == FIN
-            @_setValue FIN
             @_prev?._removeNext this
-            @_forward v, false
+            @_isEnded = true
+            @_setValue FIN, isError
         else
             try
                 unless @_resolver this, @_f, @_args, v, isError
                     @_setValue v, isError
-                    @_forward v, isError
             catch err
-                throw err.wrap if err instanceof BubbleError
-                @_setError err
-                @_forward err, true
+                throw err.wrap if err instanceof BubbleWrap
+                @_setValue err, true
         this
 
     _resolver: -> false
 
     _setValue: (v, isError) ->
-        @_isError = !!isError
-        @_value = v
-
-    _setError: (e) ->
-        @_isError = true
-        @_value = e
+        unless @_isEnded and @_value != INI
+            @_isError = isError
+            @_value = v
+        @_forward v, isError
 
     _forward: (v, isError) ->
         return if v == INI
@@ -89,7 +88,9 @@ module.exports = class Pur
 #        console.log "#{@cnt}", '_addNext'
         @_next.push n
         n._prev = this
-        n._exec @_value, @_isError unless @_value == INI
+        unless @_value == INI
+            n._exec @_value, @_isError
+            n._isEnded = @_isEnded
         return n
 
     _removeNext: (n) ->
@@ -98,7 +99,7 @@ module.exports = class Pur
         this
 
     val: ->
-        return undefined if @_value in [FIN, INI]
+        return undefined if @_value == INI
         return @_value
 
     done: ->
@@ -109,44 +110,43 @@ module.exports = class Pur
         @_addNext p
         return undefined
 
-class BubbleError extends Error
-    constructor: (@wrap) -> super
+class BubbleWrap extends Error
+    constructor: (@wrap) ->
+        super
+        @message = 'BubbleWrap'
 
 stepWith = (resolver) -> (_args...) ->
     p = new Pur(INI)
     p._resolver = resolver
     p._args = _args
-    @_addNext p
+    return @_addNext p
 
-stepWithF = (resolver) -> (_f, _args...) ->
+stepWithF = (resolver) -> (_args..., _f) ->
     p = new Pur(INI)
     p._resolver = resolver
-    p._f = _f
     p._args = _args
-    @_addNext p
-
-# invoke f with args prepended to v
-invokeWithArgs = (f, args, v) ->
-    if args and args.length then f.apply this, args.concat([v]) else f.call this, v
+    p._f = _f
+    return @_addNext p
 
 # value to indicate .always step
 ALWAYS = {always:true}
 
 stepResolver = (mode) -> (s, f, args, v, isError) ->
     return false unless mode == ALWAYS or mode == isError
-    r = invokeWithArgs f, args, v
-    if r instanceof Pur
-        r.then (x) ->
-            s._setValue x
-            s._forward x, false
-            null
-        r.fail (e) ->
-            s._setError e
-            s._forward e, true
-            null
-    else
-        s._setValue r
-        s._forward r, false
+    # array passed to concat is unwrapped
+    # [1,2].concat([3,4])   => [1,2,3,4]
+    # [1,2].concat([[3,4]]) => [1,2,[3,4]]  // this is what we want
+    av = if mode == ALWAYS then [v, isError] else [v]
+    r = if args and args.length then f.apply this, args.concat(av) else f.apply this, av
+    # unpack resolved value
+    (waitFor = (val, isError) ->
+        if val instanceof Pur
+            val.always (x, isResolvedErr) ->
+                waitFor x, isResolvedErr
+                null
+        else
+            s._setValue val, isError
+    )(r, false)
     return true
 
 thenResolver   = stepResolver(false)
@@ -155,9 +155,12 @@ alwaysResolver = stepResolver(ALWAYS)
 allResolver    = (s, f, args, v, isError) ->
     return false
 spreadResolver = (s, f, args, v, isError) ->
-    v2 = args.concat v
+    # presumably we use spread to unpack an array
+    # [1,2].concat([3,4]) => [1,2,3,4]
+    # [1,2].concat(3)     => [1,2,3]
+    v2 = (args || []).concat v
     f2 = -> f.apply this, v2
-    return thenResolver s, f2, null, null, v2, isError
+    return thenResolver s, f2, null, v2, isError
 
 StepFun = {
     then:   stepWithF(thenResolver)
