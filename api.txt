@@ -1,22 +1,26 @@
 
-def = Pure.defer()
-px  = Pure(42)
-pe  = Pure.reject(42)
+def = Pur.defer()
+px  = Pur(42)
+pe  = Pur.reject(42)
 
 def.push(x)
 def.reject(x)
 def.end() // ? do we need
 
-p = def.pure
+p = def.pur
 
-p.then(fx, a1, a2, ...)(x)
+p.isEnded()
+
+p.then/map(fx, a1, a2, ...)(x)
 p.fail/catch(fe, a1, a2, ...)(e)
 p.always/finally/fin(f, a1, a2, ...)(x or e)
 p.all([] or {})
 p.spread(fx) // for both [] and {}
+p.val()
+
+p.serial()
 
 p.filter(fx, a1, a2, ...)(x)
-p.map(fx, a1, a2, ...)(x)
 p.forEach(fx, a1, a2, ...)(x)
 
 p.delay(n)
