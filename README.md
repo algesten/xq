@@ -1,4 +1,4 @@
-Pur
+RxP
 ---
 
-Purist reactive promises
+Reactive promises

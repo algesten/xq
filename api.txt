@@ -1,27 +1,30 @@
 
-def = Pur.defer()
-px  = Pur(42)
-pe  = Pur.reject(42)
+px  = Rxp(42)
+pe  = Rxp.reject(42)
 
-def.push(x)
-def.reject(x)
-def.end() // ? do we need
-
-p = def.pur
+d.push(x)
+d.pushError(e)
+d.resolve(x)
+d.reject(e)
+d.end() // ? do we need
+p = d.promise
 
 p.isEnded()
 
-p.then/map(a1, a2, ..., fx)(x)
-p.fail/catch(a1, a2, ..., fx)(e)
-p.always/finally/fin(a1, a2, ..., f, isError)(x or e)
+p.then/map(fx, fe)(x)
+p.fail/catch(fx)(e)
+p.always/finally/fin(f, isError)(x or e)
 p.all([] or {})
-p.spread(a1, a2, ..., fx)
+p.spread(fx)
 p.val()
+p.isPending()
+p.isRejected()
+p.isFulfilled()
 
 p.serial()
 
-p.filter(fx, a1, a2, ...)(x)
-p.forEach(fx, a1, a2, ...)(x)
+p.filter(fx)(x)
+p.forEach(fx)(x)
 
 p.delay(n)
 p.throttle(n)
