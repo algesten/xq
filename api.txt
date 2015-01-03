@@ -10,17 +10,17 @@ d.end() // ? do we need
 p = d.promise
 
 p.isEnded()
-
-p.then/map(fx, fe)(x)
-p.fail/catch(fx)(e)
-p.always/finally/fin(f, isError)(x or e)
-p.all([] or {})
-p.spread(fx)
-p.val()
 p.isPending()
 p.isRejected()
 p.isFulfilled()
 
+p.then/map(fx, fe)(x)
+p.fail/catch(fx)(e)
+p.always/finally/fin(f, isError)(x or e)
+p.spread(fx)
+
+p.all([] or {})
+## p.val()
 p.serial()
 
 p.filter(fx)(x)
@@ -35,3 +35,6 @@ p.scan
 p.fold/reduce
 p.diff
 p.zip
+
+
+p.then serial:true, ->

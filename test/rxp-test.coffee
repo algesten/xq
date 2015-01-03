@@ -2,7 +2,7 @@ chai   = require 'chai'
 expect = chai.expect
 chai.should()
 chai.use(require 'sinon-chai')
-{ assert, spy, match, mock, stub } = require 'sinon'
+{ assert, spy, match, mock, stub, sandbox } = require 'sinon'
 
 RxP = require '../src/rxp'
 
@@ -79,22 +79,36 @@ describe 'RxP', ->
 
     describe 'errors', ->
 
-        it 'are silently consumed unless chain is .done', ->
+        it 'are silently consumed', ->
 
-            expect(-> RxP.reject('fail')).to.not.throw 'fail'
-            expect(-> RxP.reject('fail').done()).to.throw 'fail'
+            RxP.reject(42)
+            null
 
-        it 'is different for defers with later done', ->
+        it 'stops the chain with done', ->
+
+            expect(RxP(42).done()).to.be.undefined
+
+        it 'are reported if .done', (done) ->
+
+            RxP.reject(e = new Error('fail')).done (->), (v) ->
+                v.should.equal e
+                done()
+
+        it 'is different for defers with later done', (done) ->
 
             def = RxP.defer()
-            expect(->def.reject('fail')).to.not.throw 'fail'
-            expect(->def.promise.done()).to.throw 'fail'
+            def.reject('fail')
+            def.promise.done (->), (v) ->
+                v.should.eql 'fail'
+                done()
 
-        it 'is different for defers with done then rejected', ->
+        it 'is different for defers with done then rejected', (done) ->
 
             def = RxP.defer()
-            expect(->def.promise.done()).to.not.throw 'fail'
-            expect(->def.reject('fail')).to.throw 'fail'
+            def.promise.done (->), (v) ->
+                v.should.eql 'fail'
+                done()
+            def.reject('fail')
 
     describe '.then', ->
 
@@ -154,6 +168,12 @@ describe 'RxP', ->
                 v.should.eql panda:true
                 done()
 
+        it 'is ok to unwrap deferreds', (done) ->
+
+            RxP().then ->
+                RxP(panda:true)
+            .done(->done())
+
         it 'handles transforming chains with deferred', (done) ->
 
             RxP(42).then (v) ->
@@ -162,6 +182,7 @@ describe 'RxP', ->
             .then (v) ->
                 v.should.eql panda:true
                 done()
+            .done()
 
         it 'handles transforming chains with later deferred', (done) ->
 
@@ -221,6 +242,47 @@ describe 'RxP', ->
             def.resolve(42)
             def.push 43
 
+        it 'takes two functions', (done) ->
+
+            def = RxP.defer()
+            def.promise.then(
+                (fx = spy ->),
+                fe = ->
+                    fx.should.have.been.calledOnce
+                    fx.should.have.been.calledWith '1'
+                    done()
+            ).done()
+            def.push '1'
+            def.pushError '2'
+
+        it 'takes two functions and error in fx propagates down chain', (done) ->
+
+            def = RxP.defer()
+            def.promise.then(
+                (fx = spy -> throw 'error'),
+                (fe = spy -> done('bad'))
+            ).fail (e) ->
+                fx.should.have.been.calledOnce
+                fe.should.not.have.been.called
+                e.should.eql 'error'
+                done()
+            .done()
+            def.push '1'
+
+        it 'takes two functions and error in fe propagates down chain', (done) ->
+
+            def = RxP.defer()
+            def.promise.then(
+                (fx = spy -> done('bad')),
+                (fe = spy -> throw 'error')
+            ).fail (e) ->
+                fx.should.not.have.been.called
+                fe.should.have.been.calledOnce
+                e.should.eql 'error'
+                done()
+            .done()
+            def.pushError '1'
+
         it 'is aliased to map', ->
 
             RxP::then.should.equal RxP::map
@@ -267,7 +329,6 @@ describe 'RxP', ->
                 defnew = RxP.defer()
                 later -> defnew.resolve v + 100
                 defnew.promise
-            .done()
             def3.push 42
             def3.push 43
 
@@ -286,7 +347,6 @@ describe 'RxP', ->
                 defnew = RxP.defer()
                 later -> defnew.reject v + 100
                 defnew.promise
-            .done()
             def3.push 42
             def3.push 43
 
@@ -439,3 +499,30 @@ describe 'RxP', ->
                 expect(a1).to.be.undefined
                 done()
             .done()
+
+    describe.skip '.serial', ->
+
+        it 'stalls on any given promise and buffers additional event', (done) ->
+
+            def = RxP.defer()
+            c1 = c2 = 42
+            def.promise.serial f1 = spy (v) ->
+                v.should.eql c1++
+                v
+            .then f2 = spy (v) ->
+                v.should.eql c2++
+                done() if v == 44
+            .done()
+            def2 = RxP.defer()
+            def.push def2.promise
+            f1.should.have.been.calledOnce
+            f2.should.not.have.been.calledOnce
+            #def.push 43
+            #f1.should.have.been.calledTwice
+            #f2.should.not.have.been.calledOnce
+            #def2.resolve 42
+            #f1.should.have.been.calledTwice
+            #f2.should.not.have.been.calledTwice
+            #def.push 43
+            #f1.should.have.been.calledThrice
+            #f2.should.not.have.been.calledThrice

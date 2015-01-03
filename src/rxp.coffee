@@ -70,7 +70,7 @@ module.exports = class RxP
     _end:           => @_exec FIN, false
 
     _exec: (v, isError) ->
-#        console.log 'exec', v, @inspect()
+#        console.log 'exec', v, isError, @inspect()
         # no more pushing to finished value
         return this if @_isEnded or @_isEnding
         # last value sets isEnded and is propagated
@@ -78,22 +78,24 @@ module.exports = class RxP
             @_isEnding = true
             if @_execCount == 0 then @_doEnd() else @_doEndOnResolverExit = true
             return this
-        try
-            @_execCount++
-            unless @_resolver @_fx, @_fe, v, isError, @_resolverExit
-                @_resolverExit v, isError
-        catch err
-            @_resolverExit()
-            throw err.wrap if err instanceof BubbleWrap
-            @_setValue err, true
+        @_execCount++
+        unless @_resolver @_fx, @_fe, v, isError, @_resolverExit, @_resolverErr
+            # resolver did not handle the value => set incoming
+            @_resolverExit v, isError
         this
 
     # decreases exec count and sets the value.
     _resolverExit: (v, isErr) => # deliberate bind
 #        console.log 'resolverExit', v, @inspect()
-        console.trace() if @_cnt == 0 and @_execCount == 0
         @_execCount--
-        @_setValue v, isErr unless arguments.length == 0
+        @_setValue v, isErr
+        @_doEnd() if @_doEndOnResolverExit and @_execCount == 0
+
+    # exit resolver with an error
+    _resolverErr: (err) =>
+#        console.log 'resolverErr', v, @inspect()
+        @_execCount--
+        @_setValue err, true
         @_doEnd() if @_doEndOnResolverExit and @_execCount == 0
 
     # does the actual ending of a promise. may be called deferred if
@@ -107,7 +109,9 @@ module.exports = class RxP
 
     # the no op resolver is default
     _resolver: (fx, fe, v, isError, cb) ->
+#        console.log '_resolver', @inspect()
         unwrap v, isError, cb
+        # cb v, isError
         return true
 
     # sets the value and propagates to chained promises
@@ -128,7 +132,7 @@ module.exports = class RxP
 
     # Adds the given chained promise to this one. Returns the chained.
     _addNext: (n) ->
-#        console.log 'addNext', @inspect()
+#        console.log 'addNext', n._type, @inspect()
         @_next = [] unless @_next
         @_next.push n
         n._prev = this
@@ -147,57 +151,82 @@ module.exports = class RxP
 # mode for finally/fin/always
 ALWAYS = {always:0}
 
+# helper for doing process.nextTick in a platform independent way.
+nextTick = require './nexttick'
+
 # Creates .then-style resolvers (then, fail, always).
-makeResolver = (mode) -> (fx, fe, v, isError, cb) ->
+makeResolver = (mode) -> (fx, fe, v, isError, cb, ce) ->
     f = if mode == ALWAYS or mode == isError
         fx
     else if mode == false and isError == true
         fe
     return false unless f
-    r = f.apply undefined, if mode == ALWAYS then [v, isError] else [v]
-    throw new TypeError('f returned same promise') if r == this
-    unwrap r, false, cb
+    _this = this
+    nextTick ->
+        try
+            r = f.apply undefined, if mode == ALWAYS then [v, isError] else [v]
+            throw new TypeError('f returned same promise') if r == _this
+            unwrap r, false, cb
+        catch err
+            ce err
     return true
 
+# special error
+class TypeError extends Error
+    constructor: -> super
+
 # Makes a new promise chained off this with given resolver.
-stepWith = (type, resolver) -> (fx,fe) ->
+stepWith = (type, resolver, twoF, finish) -> (fx,fe) ->
     p = new RxP(INI)
     p._type = type
     p._resolver = resolver
     p._fx = fx
-    p._fe = fe
-    return @_addNext p
+    p._fe = fe if twoF
+    @_addNext p
+    return if finish then undefined else p
 
 # create standard step functions and their aliases
 thenResolver   = makeResolver false
 failResolver   = makeResolver true
 alwaysResolver = makeResolver ALWAYS
-RxP::then    = RxP::map   = stepWith 'then', thenResolver
+RxP::then    = RxP::map   = stepWith 'then', thenResolver, true
 RxP::fail    = RxP::catch = stepWith 'fail', failResolver
 RxP::always  = RxP::fin = RxP::finally = stepWith 'always', alwaysResolver
 # internal always-resolver to not confuse things
 RxP::_always = stepWith '[always]', alwaysResolver
 
 # spread is like then
-RxP::spread = stepWith 'spread', (fx, fe, v, isError, cb) ->
+RxP::spread = stepWith 'spread', (fx, fe, v, isError, cb, ce) ->
     # presumably we use spread to unpack an array in v, but we handle
     # single values too.
     argv = if Array.isArray(v) then v else [v]
     f = -> fx.apply undefined, argv
-    return thenResolver.call this, f, undefined, v, isError, cb
+    return thenResolver.call this, f, undefined, v, isError, cb, ce
 
 # done method is special, because it bubbles any exceptions.
-RxP::done = stepWith 'done', (fx, fe, v, isError, cb) ->
-    wrapFe = (e) ->
-        if fe
-            return fe.apply undefined, [e]
-        else
-            throw new BubbleWrap e
-    return thenResolver.call this, fx, wrapFe, v, isError, cb
+doneResolver = (fx, fe, v, isError, cb, ce) ->
+    if isError and not fe
+        fe = -> nextTick -> throw (if v instanceof Error then v else new Error(v))
+        fe = process.domain.bind(fe) if process?.domain?
+    return thenResolver.call this, fx, fe, v, isError, cb, ce
+RxP::done = stepWith 'done', doneResolver, true, true
 
-# Error that encapsulates to be bubbled up to console.
-class BubbleWrap extends Error
-    constructor: (@wrap) -> super # important
+RxP::serial = stepWith 'serial', (fx, fe, v, isError, cb, ce) ->
+    s = @_serial = [] unless s = @_serial
+    s.push Array.prototype.slice.call(arguments, 0)
+    step = ->
+        argv = s.shift()
+        return unless argv
+        icb = argv[4]
+        argv[4] = (v, isError) ->
+            icb v, isError
+            step()
+        unwrap argv[2], argv[3], (v, isError) ->
+            argv[2] = v
+            argv[3] = isError
+            thenResolver.apply this, argv
+    step()
+    return true
 
 # Recursively unwrapp the given value. Callback when we got to the
 # bottom of it.
@@ -205,5 +234,6 @@ unwrap = (v, isError, cb) ->
     if v instanceof RxP
         v._always (v, isError) ->
             unwrap v, isError, cb
+            return null # important or we get endless loops
     else
         cb v, isError
