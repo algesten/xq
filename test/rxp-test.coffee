@@ -41,6 +41,18 @@ describe 'RxP', ->
                 done()
             .done()
 
+        it 'nested deferred is interesting', (done) ->
+
+            def = RxP.defer()
+            px = RxP(def.promise)
+            c = 42
+            px.then (v) ->
+                v.should.eql c++
+                done() if v == 43
+            .done()
+            later -> def.push 42
+            later -> def.push 43
+
     describe 'error instantiation', ->
 
         it 'is done RxP.reject(e)', ->
@@ -296,6 +308,7 @@ describe 'RxP', ->
             def.promise.then (v) ->
                 v.should.eql 42
                 done()
+            .done()
             def2 = RxP.defer()
             def.push def2.promise
             def2.push 42
@@ -307,12 +320,13 @@ describe 'RxP', ->
             def.promise.then (v) ->
                 v.should.eql 42 + n++
                 done() if n == 2
+            .done()
             def2 = RxP.defer()
             def3 = RxP.defer()
             def2.push def3.promise
             def.push def2.promise
-            def3.push 42
-            def3.push 43
+            later -> def3.push 42
+            later -> def3.push 43
 
         it 'handles deferreds created on the fly', (done) ->
 
@@ -329,8 +343,8 @@ describe 'RxP', ->
                 defnew = RxP.defer()
                 later -> defnew.resolve v + 100
                 defnew.promise
-            def3.push 42
-            def3.push 43
+            later -> def3.push 42
+            later -> def3.push 43
 
         it 'handles failed deferreds created on the fly', (done) ->
 
@@ -343,12 +357,12 @@ describe 'RxP', ->
             def2 = RxP.defer()
             def3 = RxP.defer()
             def2.push def3.promise
-            def.push def3.promise.then (v) ->
+            def.pushError def3.promise.then (v) ->
                 defnew = RxP.defer()
                 later -> defnew.reject v + 100
                 defnew.promise
-            def3.push 42
-            def3.push 43
+            later -> def3.push 42
+            later -> def3.push 43
 
     describe '.fail', ->
 
@@ -500,29 +514,60 @@ describe 'RxP', ->
                 done()
             .done()
 
+    describe '.forEach', ->
+
+        it 'turns any incoming array into a series of events', (done) ->
+
+            c = 0
+            RxP([0,1,2,3,4,5]).forEach (v) ->
+                v.should.eql c++
+                done() if v == 5
+            .done()
+
+        it 'does nothing with an empty array', (done) ->
+
+            RxP([]).forEach (v) ->
+                done('bad ' + v)
+            .done()
+            done()
+
+        it 'passes non arrays down the chain', (done) ->
+
+            RxP(42).forEach (v) ->
+                v.should.eql 42
+                done()
+            .done()
+
+        it 'no handler is fine', (done) ->
+
+            c = 0
+            RxP([0,1,2,3]).forEach().then (v) ->
+                v.should.eql c++
+                done() if v == 3
+            .done()
+
+        it 'is special because defereds are not resolved before pushed down chain', ->
+
+            def = RxP.defer()
+            c = 0
+            RxP([0,def.promise,2]).forEach (v) ->
+                if c == 0
+                    v.should.eql 0
+                else if c == 1
+                    v.isPending().should.be.true
+                else if c == 2
+                    v.should.eql 2
+                c++
+                v
+            .done()
+
     describe.skip '.serial', ->
 
         it 'stalls on any given promise and buffers additional event', (done) ->
 
             def = RxP.defer()
-            c1 = c2 = 42
-            def.promise.serial f1 = spy (v) ->
-                v.should.eql c1++
-                v
-            .then f2 = spy (v) ->
-                v.should.eql c2++
-                done() if v == 44
+            c = 0
+            RxP([0,def.promise,2]).forEach().serial (v) ->
+                v.should.eql c++
+                done() if v == 2
             .done()
-            def2 = RxP.defer()
-            def.push def2.promise
-            f1.should.have.been.calledOnce
-            f2.should.not.have.been.calledOnce
-            #def.push 43
-            #f1.should.have.been.calledTwice
-            #f2.should.not.have.been.calledOnce
-            #def2.resolve 42
-            #f1.should.have.been.calledTwice
-            #f2.should.not.have.been.calledTwice
-            #def.push 43
-            #f1.should.have.been.calledThrice
-            #f2.should.not.have.been.calledThrice

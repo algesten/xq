@@ -3,8 +3,11 @@
 # handled undefined as well.
 INI = {ini:0}
 
-# special value used to propagate through promise chain to signal end.
+# value used to propagate through promise chain to signal end.
 FIN = {fin:0}
+
+# value that indicates no value.
+NVA = {nva:0}
 
 cnt = 0
 
@@ -84,9 +87,16 @@ module.exports = class RxP
             @_resolverExit v, isError
         this
 
+    # the no op resolver is default
+    _resolver: (fx, fe, v, isError, cb) ->
+#        console.log '_resolver', v, isError, @inspect()
+        # root resolver does unwrap
+        unwrap v, isError, cb
+        return true
+
     # decreases exec count and sets the value.
     _resolverExit: (v, isErr) => # deliberate bind
-#        console.log 'resolverExit', v, @inspect()
+#        console.log 'resolverExit', v, isErr, @inspect()
         @_execCount--
         @_setValue v, isErr
         @_doEnd() if @_doEndOnResolverExit and @_execCount == 0
@@ -107,17 +117,12 @@ module.exports = class RxP
         @_forward FIN, false
         return this
 
-    # the no op resolver is default
-    _resolver: (fx, fe, v, isError, cb) ->
-#        console.log '_resolver', @inspect()
-        unwrap v, isError, cb
-        # cb v, isError
-        return true
-
     # sets the value and propagates to chained promises
     _setValue: (v, isError) ->
 #        console.log 'setValue', v, @inspect()
-        return this if @_isEnded # ended takes no more values
+        # ended takes no more values and NVA is emitted from some
+        # resolver to indicate no value.
+        return this if @_isEnded or v == NVA
         @_value   = v
         @_isError = isError
         @_forward v, isError
@@ -171,10 +176,6 @@ makeResolver = (mode) -> (fx, fe, v, isError, cb, ce) ->
             ce err
     return true
 
-# special error
-class TypeError extends Error
-    constructor: -> super
-
 # Makes a new promise chained off this with given resolver.
 stepWith = (type, resolver, twoF, finish) -> (fx,fe) ->
     p = new RxP(INI)
@@ -211,24 +212,56 @@ doneResolver = (fx, fe, v, isError, cb, ce) ->
     return thenResolver.call this, fx, fe, v, isError, cb, ce
 RxP::done = stepWith 'done', doneResolver, true, true
 
-RxP::serial = stepWith 'serial', (fx, fe, v, isError, cb, ce) ->
-    s = @_serial = [] unless s = @_serial
-    s.push Array.prototype.slice.call(arguments, 0)
-    step = ->
-        argv = s.shift()
-        return unless argv
-        icb = argv[4]
-        argv[4] = (v, isError) ->
-            icb v, isError
-            step()
-        unwrap argv[2], argv[3], (v, isError) ->
-            argv[2] = v
-            argv[3] = isError
-            thenResolver.apply this, argv
-    step()
+
+RxP::_serialEnqueue = (fx, fe, v, isError, cb, ce) ->
+    unless s = @_serial
+        s = @_serial =
+            head: head = task: undefined, next:null
+            tail: head
+    _this = this
+    wrap = (c) -> (v, isError) ->
+        c v, isError
+        _this._serialNext()
+    s.tail = s.tail.next =
+        task: [fx, fe, v, isError, wrap(cb), wrap(ce)]
+        next: null
+
+RxP::_serialNext = ->
+    s = @_serial
+    return false unless s.head.next
+    s.head = s.head.next
+    task = s.head.task
+    s.head.task = null
+    unless thenResolver.apply this, task
+        # unhandled values must be set
+        @_resolverExit task[2], task[3]
     return true
 
-# Recursively unwrapp the given value. Callback when we got to the
+serialResolver = (fx, fe, v, isError, cb, ce) ->
+    @_serialEnqueue fx, fe, v, isError, cb, ce
+    @_serialNext()
+    return true
+
+RxP::serial = stepWith 'serial', serialResolver, true
+
+forEachResolver = (fx, fe, v, isError, cb, ce) ->
+    if !isError and Array.isArray v
+        # zero length array means we emit no value down the chain.
+        if v.length == 0
+            cb NVA, false
+            return true
+        # increase exec count with the amount of values we intend to
+        # emit -1 for the one already counted up when entering _exec.
+        @_execCount += (v.length - 1)
+        for x in v
+            unless thenResolver.call(this, fx, fe, x, false, cb, ce)
+                do (x) -> nextTick -> cb x, false
+        return true
+    else
+        return thenResolver.call this, fx, fe, v, isError, cb, ce
+RxP::forEach = stepWith 'forEach', forEachResolver
+
+# Recursively unwrap the given value. Callback when we got to the
 # bottom of it.
 unwrap = (v, isError, cb) ->
     if v instanceof RxP
