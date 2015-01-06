@@ -2,7 +2,7 @@
   "name": "xq",
   "version": "0.0.1",
   "description": "Reactive Promises",
-  "main": "index.js",
+  "main": "lib/xq.js",
   "scripts": {
     "test": "mocha",
     "prepublish": "coffee -c -o lib src/xq.coffee"
@@ -25,5 +25,21 @@
     "sinon-chai": "^2.6.0"
   },
   "dependencies": {
-  }
+  },
+  "keywords":
+   [ "xq",
+     "promise",
+     "promises",
+     "promises-a",
+     "promises-aplus",
+     "deferred",
+     "future",
+     "async",
+     "linq",
+     "frp",
+     "reactive",
+     "events",
+     "q",
+     "rx",
+     "rxjs"]
 }
