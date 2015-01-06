@@ -28,15 +28,13 @@ p.then serial:true, (v) ->
 p.then.serial (v) ->
 
 p.filter(fx)(x)
+p.scan / p.diff, arent they the same?
+p.fold/reduce
+p.slidingWindow
 
 p.delay(n)
 p.throttle(n)
 p.debounce([immed], n)
-
-p.scan
-p.fold/reduce
-p.diff
-p.zip
 
 p.any
 p.every

@@ -138,6 +138,12 @@ equivalent.
   `fx`. I.e. `[a0,a1,a2]` will invoke `fx(a0, a1, a2)`. Non-array
   values will be invoked as first argument (`f(v)`).
 
+### Filtering
+
+* **p.filter(f)** apply function `f` to each value. If `f` returns a
+  truthy, the original value will be released down the chain.
+
+
 ### Serialization
 
 Some methods have serial variants. The serial variant guarantees that

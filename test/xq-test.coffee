@@ -685,3 +685,57 @@ describe 'X', ->
             later -> def.push 2
             later -> f.should.not.have.been.calledOnce
             later -> def.end()
+
+    describe '.filter', ->
+
+        it 'releases the original value if step function is true', (done) ->
+
+            c = 1
+            X([0,1,2,3]).forEach().filter (v) ->
+                v % 2 == 1
+            .then (v) ->
+                v.should.eql c
+                c += 2
+                done() if v == 3
+            .done()
+
+        it 'releases the original value if step function is truthy', (done) ->
+
+            n = 0
+            ref = [1, 'a', true, {}]
+            X([0,1,'','a',false,true,undefined,{}]).forEach().filter (v) ->
+                v
+            .then (v) ->
+                v.should.eql ref[n++]
+                done() if n == 3
+            .done()
+
+        it.only 'releases the original if a deferred value is truthy', (done) ->
+
+            n = 0
+            ref = [1, 'a', true, {}]
+            X([0,1,'','a',false,true,undefined,{}]).forEach().filter (v) ->
+                def = X.defer()
+                later -> def.resolve(v)
+                def.promise
+            .then (v) ->
+                v.should.eql ref[n++]
+                done() if n == 3
+            .done()
+
+        it 'releases errors in filter function', (done) ->
+
+            X().filter (v) ->
+                v() # undefined
+            .fail (err) ->
+                done()
+            .done()
+
+        it 'skips errors', (done) ->
+
+            X.reject('fail').filter (v) ->
+                done('bad')
+            .fail (err) ->
+                err.should.eql 'fail'
+                done()
+            .done()

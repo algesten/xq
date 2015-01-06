@@ -300,6 +300,23 @@ forEachResolver = (fx, fe, v, isError, cb) ->
         return thenResolver.call this, fx, fe, v, isError, cb
 X::forEach = stepWith 'forEach', forEachResolver
 
+# resolver to handle .filter (x) ->. if returned value is truthy,
+# value is released down the chain.
+filterResolver = (fx, fe, v, isError, cb) ->
+    return false if isError
+    filterCb = (vb, isError, ended) ->
+        if isError
+            cb vb, isError, ended
+        else
+            if vb == NVA
+                cb NVA, false, ended
+            else if vb # truthy
+                cb v, false, ended # release original value
+            else
+                cb NVA, false, ended
+    return thenResolver.call this, fx, fe, v, isError, filterCb
+X::filter = stepWith 'filter', filterResolver
+
 # methods with serial version where arguments are _exec one by one.
 SERIAL = ['then', 'fail', 'always', 'spread', 'forEach']
 
