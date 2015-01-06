@@ -4,7 +4,7 @@ XQ - Reactive Promises (experimental)
 XQ is a hybrid between promises and reactive extensions. A simple
 clean API modelled on promises with the addition of event streams.
 
-Think of a promise chain, but you can push multiple values down it.
+Think of a promise chain, but you can push multiple values down it. `.then == .map`
 
 ## Example
 
@@ -58,39 +58,6 @@ def.push 22
 #... 42
 #... 44
 ```
-
-## Why a hybrid?
-
-I like promises such as [Q](https://github.com/kriskowal/q) I also
-like reactive extensions (FRP). However I don't like the API that
-comes with libraries such as
-[RxJS](https://github.com/Reactive-Extensions/RxJS),
-[Bacon.js](https://baconjs.github.io/) etc. My biggest beef is with
-something rx-people call `flatMap`.
-
-#### Comparison of Q and Bacon.js
-
-`Q(42).then((v) -> Q(2*v)).then (v) -> ...v is 84`
-
-`Bacon.once(42).map((v) -> Bacon.once(2*v)).flatMap (v) -> ...v is 84`
-
-For promises we continue a chain with `.then .then .then`. It doesn't
-matter whether the returned value in a step is a promise for a value
-`Q(2*v)` or a non-deferred.
-
-With regards to the second `.then`, these two chains are equivalent.
-
-`.then(-> 4).then (v) ->`
-
-`.then(-> Q(4)).then (v) ->`
-
-In the rx-world things are not so easy. As long as you just transform
-simple (non-deferred) values, you keep using `.map`, however if you
-dare returning a deferred value (observable or event stream) you
-probably want `.flatMap`.
-
-In XQ `then` == `map`, there is no difference and a deferred value is
-just a special case of an event stream.
 
 ## Deferred values and Event Streams
 
@@ -197,3 +164,36 @@ $ npm install xq
 ...
 X = require 'xq'
 ```
+
+## Why a hybrid?
+
+I like promises such as [Q](https://github.com/kriskowal/q) I also
+like reactive extensions (FRP). However I don't like the API that
+comes with libraries such as
+[RxJS](https://github.com/Reactive-Extensions/RxJS),
+[Bacon.js](https://baconjs.github.io/) etc. My biggest beef is with
+something rx-people call `flatMap`.
+
+#### Comparison of Q and Bacon.js
+
+`Q(42).then((v) -> Q(2*v)).then (v) -> ...v is 84`
+
+`Bacon.once(42).map((v) -> Bacon.once(2*v)).flatMap (v) -> ...v is 84`
+
+For promises we continue a chain with `.then .then .then`. It doesn't
+matter whether the returned value in a step is a promise for a value
+`Q(2*v)` or a non-deferred.
+
+With regards to the second `.then`, these two chains are equivalent.
+
+`.then(-> 4).then (v) ->`
+
+`.then(-> Q(4)).then (v) ->`
+
+In the rx-world things are not so easy. As long as you just transform
+simple (non-deferred) values, you keep using `.map`, however if you
+dare returning a deferred value (observable or event stream) you
+probably want `.flatMap`.
+
+In XQ `then` == `map`, there is no difference and a deferred value is
+just a special case of an event stream.
