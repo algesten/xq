@@ -202,7 +202,7 @@ safeCall = (f, v) ->
 ALWAYS = {always:0}
 
 # helper for doing process.nextTick in a platform independent way.
-nextTick = require './nexttick'
+nextTick = require '../lib/nexttick'
 
 # Creates .then-style resolvers (then, fail, always).
 makeResolver = (mode) -> (fx, fe, v, isError, cb) ->
