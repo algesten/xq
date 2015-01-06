@@ -190,8 +190,10 @@ git clone https://github.com/algesten/xq.git
 cd ./xq
 ```
 
-### Installing with [NPM](https://npmjs.org/)
+### Installing with NPM
 
 ```bash`
 $ npm install xq
+...
+X = require 'xq'
 ```
