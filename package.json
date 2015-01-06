@@ -1,22 +1,22 @@
 {
-  "name": "pur",
+  "name": "xq",
   "version": "0.0.1",
-  "description": "Purist reactive promises",
+  "description": "Reactive Promises",
   "main": "index.js",
   "scripts": {
     "test": "mocha",
-    "prepublish": "coffee -c -o lib src/pur.coffee"
+    "prepublish": "coffee -c -o lib src/xq.coffee"
   },
   "repository": {
     "type": "git",
-    "url": "git://github.com/algesten/pur.git"
+    "url": "git://github.com/algesten/xq.git"
   },
   "author": "Martin Algesten",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/algesten/pur/issues"
+    "url": "https://github.com/algesten/xq/issues"
   },
-  "homepage": "https://github.com/algesten/pur",
+  "homepage": "https://github.com/algesten/xq",
   "devDependencies": {
     "chai": "^1.10.0",
     "coffee-script": "^1.8.0",

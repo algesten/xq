@@ -4,28 +4,28 @@ chai.should()
 chai.use(require 'sinon-chai')
 { assert, spy, match, mock, stub, sandbox } = require 'sinon'
 
-RxP = require '../src/rxp'
+X = require '../src/xq'
 
 later = (f) -> setTimeout f, 5
 
-describe 'RxP', ->
+describe 'X', ->
 
     describe 'value instantiation', ->
 
-        it 'is done RxP(x)', ->
+        it 'is done X(x)', ->
 
-            px = RxP(x = 42)
+            px = X(x = 42)
             px.isEnded().should.eql true
 
         it 'is also ok with nothing', (done) ->
 
-            px = RxP()
+            px = X()
             px.isEnded().should.eql true
             px.then done
 
         it 'nested 2 levels are fine', (done) ->
 
-            px = RxP(RxP(42))
+            px = X(X(42))
             px.isEnded().should.eql true
             px.then (v) ->
                 v.should.eql 42
@@ -34,7 +34,7 @@ describe 'RxP', ->
 
         it 'nested 3 levels are fine', (done) ->
 
-            px = RxP(RxP(RxP(42)))
+            px = X(X(X(42)))
             px.isEnded().should.eql true
             px.then (v) ->
                 v.should.eql 42
@@ -43,8 +43,8 @@ describe 'RxP', ->
 
         it 'nested deferred is interesting', (done) ->
 
-            def = RxP.defer()
-            px = RxP(def.promise)
+            def = X.defer()
+            px = X(def.promise)
             c = 42
             px.then (v) ->
                 v.should.eql c++
@@ -55,60 +55,60 @@ describe 'RxP', ->
 
     describe 'error instantiation', ->
 
-        it 'is done RxP.reject(e)', ->
+        it 'is done X.reject(e)', ->
 
-            pe = RxP.reject(e = new Error('wrong'))
+            pe = X.reject(e = new Error('wrong'))
             pe.isEnded().should.eql true
 
         it 'is ok with nothing', (done) ->
 
-            pe = RxP.reject()
+            pe = X.reject()
             pe.isEnded().should.eql true
             pe.fail done
 
     describe 'defer instantiation', ->
 
-        it 'is done RxP.defer()', ->
+        it 'is done X.defer()', ->
 
-            def = RxP.defer()
+            def = X.defer()
 
         it 'can optionally take an initial value', ->
 
-            def = RxP.defer(x = 42)
+            def = X.defer(x = 42)
 
     describe 'def.promise', ->
 
-        it 'is used to get RxP from def', ->
+        it 'is used to get X from def', ->
 
-            def = RxP.defer()
-            expect(def.promise).to.be.instanceof RxP
+            def = X.defer()
+            expect(def.promise).to.be.instanceof X
             def.promise._def.should.equal def
 
         it 'should not be ended', ->
 
-            def = RxP.defer()
+            def = X.defer()
             def.promise.isEnded().should.eql false
 
     describe 'errors', ->
 
         it 'are silently consumed', ->
 
-            RxP.reject(42)
+            X.reject(42)
             null
 
         it 'stops the chain with done', ->
 
-            expect(RxP(42).done()).to.be.undefined
+            expect(X(42).done()).to.be.undefined
 
         it 'are reported if .done', (done) ->
 
-            RxP.reject(e = new Error('fail')).done (->), (v) ->
+            X.reject(e = new Error('fail')).done (->), (v) ->
                 v.should.equal e
                 done()
 
         it 'is different for defers with later done', (done) ->
 
-            def = RxP.defer()
+            def = X.defer()
             def.reject('fail')
             def.promise.done (->), (v) ->
                 v.should.eql 'fail'
@@ -116,7 +116,7 @@ describe 'RxP', ->
 
         it 'is different for defers with done then rejected', (done) ->
 
-            def = RxP.defer()
+            def = X.defer()
             def.promise.done (->), (v) ->
                 v.should.eql 'fail'
                 done()
@@ -124,7 +124,7 @@ describe 'RxP', ->
 
         it 'works fine with deep errors', (done) ->
 
-            RxP().then ->
+            X().then ->
                 throw new Error('fail')
             .fail (v) ->
                 throw v
@@ -135,13 +135,13 @@ describe 'RxP', ->
 
         it 'handles simple values', (done) ->
 
-            RxP(42).then (v) ->
+            X(42).then (v) ->
                 v.should.eql 42
                 done()
 
         it 'handles deferred', (done) ->
 
-            def = RxP.defer()
+            def = X.defer()
             def.promise.then (v) ->
                 v.should.eql 42
                 done()
@@ -149,7 +149,7 @@ describe 'RxP', ->
 
         it 'handles then connected after deferred push', (done) ->
 
-            def = RxP.defer()
+            def = X.defer()
             def.push 42
             def.promise.then (v) ->
                 v.should.eql 42
@@ -157,7 +157,7 @@ describe 'RxP', ->
 
         it 'handles then connected after deferred resolve', (done) ->
 
-            def = RxP.defer()
+            def = X.defer()
             def.resolve 42
             def.promise.then (v) ->
                 v.should.eql 42
@@ -165,16 +165,16 @@ describe 'RxP', ->
 
         it 'resolves pushed deferreds', (done) ->
 
-            def = RxP.defer()
+            def = X.defer()
             def.promise.then (v) ->
                 v.should.eql 42
                 done()
             .done()
-            def.push RxP(42)
+            def.push X(42)
 
         it 'resolves already pushed value', (done) ->
 
-            def = RxP.defer()
+            def = X.defer()
             def.push 42
             def.promise.then (v) ->
                 v.should.eql 42
@@ -182,7 +182,7 @@ describe 'RxP', ->
 
         it 'handles simple transforming chains', (done) ->
 
-            RxP(42).then (v) ->
+            X(42).then (v) ->
                 v.should.eql 42
                 panda:true
             .then (v) ->
@@ -191,15 +191,15 @@ describe 'RxP', ->
 
         it 'is ok to unwrap deferreds', (done) ->
 
-            RxP().then ->
-                RxP(panda:true)
+            X().then ->
+                X(panda:true)
             .done(->done())
 
         it 'handles transforming chains with deferred', (done) ->
 
-            RxP(42).then (v) ->
+            X(42).then (v) ->
                 v.should.eql 42
-                RxP(panda:true)
+                X(panda:true)
             .then (v) ->
                 v.should.eql panda:true
                 done()
@@ -207,9 +207,9 @@ describe 'RxP', ->
 
         it 'handles transforming chains with later deferred', (done) ->
 
-            RxP(42).then (v) ->
+            X(42).then (v) ->
                 v.should.eql 42
-                def = RxP.defer()
+                def = X.defer()
                 later ->
                     def.resolve panda:true
                 def.promise
@@ -222,7 +222,7 @@ describe 'RxP', ->
 
         it 'can do transforming chains with root deferred', (done) ->
 
-            def = RxP.defer()
+            def = X.defer()
             def.promise.then (v) ->
                 v.should.eql 42
                 panda:42
@@ -233,7 +233,7 @@ describe 'RxP', ->
 
         it 'can handle repeated events through chain', (done) ->
 
-            def = RxP.defer()
+            def = X.defer()
             n = 0
             def.promise.then (v) ->
                 v.should.eql 42 + n++
@@ -244,7 +244,7 @@ describe 'RxP', ->
 
         it 'does not get repeated events when def is ended', (done) ->
 
-            def = RxP.defer()
+            def = X.defer()
             n = 0
             def.promise.then (v) ->
                 v.should.eql 42
@@ -255,7 +255,7 @@ describe 'RxP', ->
 
         it 'will not get event for resolved', (done) ->
 
-            def = RxP.defer()
+            def = X.defer()
             n = 0
             def.promise.then (v) ->
                 v.should.eql 42
@@ -265,7 +265,7 @@ describe 'RxP', ->
 
         it 'takes two functions', (done) ->
 
-            def = RxP.defer()
+            def = X.defer()
             def.promise.then(
                 (fx = spy ->),
                 fe = ->
@@ -278,7 +278,7 @@ describe 'RxP', ->
 
         it 'takes two functions and error in fx propagates down chain', (done) ->
 
-            def = RxP.defer()
+            def = X.defer()
             def.promise.then(
                 (fx = spy -> throw 'error'),
                 (fe = spy -> done('bad'))
@@ -292,7 +292,7 @@ describe 'RxP', ->
 
         it 'takes two functions and error in fe propagates down chain', (done) ->
 
-            def = RxP.defer()
+            def = X.defer()
             def.promise.then(
                 (fx = spy -> done('bad')),
                 (fe = spy -> throw 'error')
@@ -306,32 +306,32 @@ describe 'RxP', ->
 
         it 'is aliased to map', ->
 
-            RxP::then.should.equal RxP::map
+            X::then.should.equal X::map
 
 
     describe '.then with defered in defereds', ->
 
         it 'is ok', (done) ->
 
-            def = RxP.defer()
+            def = X.defer()
             def.promise.then (v) ->
                 v.should.eql 42
                 done()
             .done()
-            def2 = RxP.defer()
+            def2 = X.defer()
             def.push def2.promise
             def2.push 42
 
         it 'handles deferreds in deferreds', (done) ->
 
-            def = RxP.defer()
+            def = X.defer()
             n = 0
             def.promise.then (v) ->
                 v.should.eql 42 + n++
                 done() if n == 2
             .done()
-            def2 = RxP.defer()
-            def3 = RxP.defer()
+            def2 = X.defer()
+            def3 = X.defer()
             def2.push def3.promise
             def.push def2.promise
             later -> def3.push 42
@@ -339,17 +339,17 @@ describe 'RxP', ->
 
         it 'handles deferreds created on the fly', (done) ->
 
-            def = RxP.defer()
+            def = X.defer()
             n = 0
             def.promise.then (v) ->
                 v.should.eql 142 + n++
                 done() if n == 2
             .done()
-            def2 = RxP.defer()
-            def3 = RxP.defer()
+            def2 = X.defer()
+            def3 = X.defer()
             def2.push def3.promise
             def.push def3.promise.then (v) ->
-                defnew = RxP.defer()
+                defnew = X.defer()
                 later -> defnew.resolve v + 100
                 defnew.promise
             later -> def3.push 42
@@ -357,17 +357,17 @@ describe 'RxP', ->
 
         it 'handles failed deferreds created on the fly', (done) ->
 
-            def = RxP.defer()
+            def = X.defer()
             n = 0
             def.promise.fail (v) ->
                 v.should.eql 142 + n++
                 done() if n == 2
             .done()
-            def2 = RxP.defer()
-            def3 = RxP.defer()
+            def2 = X.defer()
+            def3 = X.defer()
             def2.push def3.promise
             def.pushError def3.promise.then (v) ->
-                defnew = RxP.defer()
+                defnew = X.defer()
                 later -> defnew.reject v + 100
                 defnew.promise
             later -> def3.push 42
@@ -377,13 +377,13 @@ describe 'RxP', ->
 
         it 'is invoked for simple rejected', (done) ->
 
-            RxP.reject(42).fail (v) ->
+            X.reject(42).fail (v) ->
                 v.should.eql 42
                 done()
 
         it 'is not invoked for non rejected', (done) ->
 
-            RxP(42).then (v) ->
+            X(42).then (v) ->
                 v.should.eql 42
                 done()
             .fail (v) ->
@@ -391,7 +391,7 @@ describe 'RxP', ->
 
         it 'is invoked if chained after .then', (done) ->
 
-            RxP.reject(42).then ->
+            X.reject(42).then ->
                 done('bad')
             .fail (v) ->
                 v.should.eql 42
@@ -399,7 +399,7 @@ describe 'RxP', ->
 
         it 'invokes following then if no error', (done) ->
 
-            RxP.reject(42).fail (v) ->
+            X.reject(42).fail (v) ->
                 v
             .then (v) ->
                 v.should.eql 42
@@ -407,7 +407,7 @@ describe 'RxP', ->
 
         it 'doesnt invoke any following fail if no error', (done) ->
 
-            RxP.reject(42).fail (v) ->
+            X.reject(42).fail (v) ->
                 v
             .fail (v) ->
                 done('bad')
@@ -417,7 +417,7 @@ describe 'RxP', ->
 
         it 'invokes fail for errors thrown in then', (done) ->
 
-            RxP(42).then (v) ->
+            X(42).then (v) ->
                 throw 'failed'
             .then (v) ->
                 done('bad')
@@ -427,7 +427,7 @@ describe 'RxP', ->
 
         it 'can handle repeated errors through chain', (done) ->
 
-            def = RxP.defer()
+            def = X.defer()
             n = 0
             def.promise.fail (v) ->
                 v.should.eql 42 + n++
@@ -437,7 +437,7 @@ describe 'RxP', ->
 
         it 'does not get repeated errors when def is ended', (done) ->
 
-            def = RxP.defer()
+            def = X.defer()
             n = 0
             def.promise.fail (v) ->
                 v.should.eql 42
@@ -448,7 +448,7 @@ describe 'RxP', ->
 
         it 'will not get errors for resolved', (done) ->
 
-            def = RxP.defer()
+            def = X.defer()
             n = 0
             def.promise.fail (v) ->
                 v.should.eql 42
@@ -458,13 +458,13 @@ describe 'RxP', ->
 
         it 'is aliased to catch', ->
 
-            RxP::fail.should.equal RxP::catch
+            X::fail.should.equal X::catch
 
     describe '.always', ->
 
         it 'is invoked for normal values', (done) ->
 
-            RxP(42).always (v, isError) ->
+            X(42).always (v, isError) ->
                 v.should.eql 42
                 isError.should.eql false
                 done()
@@ -472,7 +472,7 @@ describe 'RxP', ->
 
         it 'is invoked for errors', (done) ->
 
-            RxP.reject(42).always (v, isError) ->
+            X.reject(42).always (v, isError) ->
                 v.should.eql 42
                 isError.should.eql true
                 done()
@@ -480,7 +480,7 @@ describe 'RxP', ->
 
         it 'becomes normal values after in chain', (done) ->
 
-            RxP.reject(42).always (v) ->
+            X.reject(42).always (v) ->
                 v.should.eql 42
                 v
             .fail ->
@@ -491,7 +491,7 @@ describe 'RxP', ->
 
         it 'can be event fed both values and errors', (done) ->
 
-            def = RxP.defer()
+            def = X.defer()
             n = 0
             def.promise.always (v) ->
                 v.should.eql 42 + n++
@@ -502,14 +502,14 @@ describe 'RxP', ->
 
         it 'is aliased to fin and finally', ->
 
-            RxP::always.should.equal RxP::fin
-            RxP::always.should.equal RxP::finally
+            X::always.should.equal X::fin
+            X::always.should.equal X::finally
 
     describe '.spread', ->
 
         it 'unpacks any incoming array to function arguments', (done) ->
 
-            RxP([1,2]).spread (a0, a1) ->
+            X([1,2]).spread (a0, a1) ->
                 a0.should.eql 1
                 a1.should.eql 2
                 done()
@@ -517,7 +517,7 @@ describe 'RxP', ->
 
         it 'handles single values', (done) ->
 
-            RxP(42).spread (a0, a1) ->
+            X(42).spread (a0, a1) ->
                 a0.should.eql 42
                 expect(a1).to.be.undefined
                 done()
@@ -528,21 +528,21 @@ describe 'RxP', ->
         it 'turns any incoming array into a series of events', (done) ->
 
             c = 0
-            RxP([0,1,2,3,4,5]).forEach (v) ->
+            X([0,1,2,3,4,5]).forEach (v) ->
                 v.should.eql c++
                 done() if v == 5
             .done()
 
         it 'does nothing with an empty array', (done) ->
 
-            RxP([]).forEach (v) ->
+            X([]).forEach (v) ->
                 done('bad ' + v)
             .done()
             done()
 
         it 'passes non arrays down the chain', (done) ->
 
-            RxP(42).forEach (v) ->
+            X(42).forEach (v) ->
                 v.should.eql 42
                 done()
             .done()
@@ -550,7 +550,7 @@ describe 'RxP', ->
         it 'no handler is fine', (done) ->
 
             c = 0
-            RxP([0,1,2,3]).forEach().then (v) ->
+            X([0,1,2,3]).forEach().then (v) ->
                 v.should.eql c++
                 done() if v == 3
             .done()
@@ -559,9 +559,9 @@ describe 'RxP', ->
 
         it 'has a serial version of .forEach', (done) ->
 
-            def = RxP.defer()
+            def = X.defer()
             c = 0
-            RxP([0,def.promise,2]).forEach.serial().then (v) ->
+            X([0,def.promise,2]).forEach.serial().then (v) ->
                 v.should.eql c++
                 done() if v == 2
             .done()
@@ -572,9 +572,9 @@ describe 'RxP', ->
 
             def = null
             c = 0
-            RxP([0,1,2]).forEach().then.serial f = spy (v) ->
+            X([0,1,2]).forEach().then.serial f = spy (v) ->
                 if v == 1
-                    (def = RxP.defer()).promise
+                    (def = X.defer()).promise
                 else
                     v
             .then (v) ->
@@ -594,11 +594,11 @@ describe 'RxP', ->
 
             def = null
             c = 0
-            RxP([0,1,2]).forEach (v) ->
+            X([0,1,2]).forEach (v) ->
                 throw v
             .fail.serial f = spy (v) ->
                 if v == 1
-                    (def = RxP.defer()).promise
+                    (def = X.defer()).promise
                 else
                     v
             .then (v) ->
@@ -618,14 +618,14 @@ describe 'RxP', ->
 
             def = null
             c = 0
-            RxP([0,1,2]).forEach (v) ->
+            X([0,1,2]).forEach (v) ->
                 if v == 1
                     throw v
                 else
                     v
             .always.serial f = spy (v) ->
                 if v == 1
-                    (def = RxP.defer()).promise
+                    (def = X.defer()).promise
                 else
                     v
             .then (v) ->
@@ -645,12 +645,12 @@ describe 'RxP', ->
 
             def = null
             c = 0
-            RxP([0,1,2]).forEach (v) ->
+            X([0,1,2]).forEach (v) ->
                 [v,v]
             .spread.serial f = spy (v1, v2) ->
                 v1.should.eql v2
                 if v1 == 1
-                    (def = RxP.defer()).promise
+                    (def = X.defer()).promise
                 else
                     v1
             .then (v) ->
@@ -670,16 +670,16 @@ describe 'RxP', ->
 
         it 'is called when stream ends for promises', (done) ->
 
-            RxP().onEnd -> done()
+            X().onEnd -> done()
 
         it 'is called for deferred promise', (done) ->
 
-            (def = RxP.defer()).promise.onEnd -> done()
+            (def = X.defer()).promise.onEnd -> done()
             later -> def.resolve 1
 
         it 'waits until end of stream', (done) ->
 
-            (def = RxP.defer()).promise.onEnd f = spy -> done()
+            (def = X.defer()).promise.onEnd f = spy -> done()
             later -> def.push 0
             later -> def.push 1
             later -> def.push 2

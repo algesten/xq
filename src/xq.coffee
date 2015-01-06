@@ -11,7 +11,7 @@ NVA = {nva:0}
 
 cnt = 0
 
-module.exports = class RxP
+module.exports = class X
 
     _value:     INI      # the current value
     _isError:   false    # whether the value is an error
@@ -35,13 +35,13 @@ module.exports = class RxP
         "end:#{@_isEnded}, exec:#{@_execCount}, ser:#{@_serial}}"
 
     constructor: (v) ->
-        return new RxP(v) unless this instanceof RxP
+        return new X(v) unless this instanceof X
 
         @_cnt = cnt++
 
-        if v instanceof RxP
+        if v instanceof X
             # We chain ourselves to the given promise.
-            # I.e. RxP(RxP(42)) is the same value as RxP(42).
+            # I.e. X(X(42)) is the same value as X(42).
             v._addNext this
         else
             # Given a real value, we are already resolved.
@@ -51,8 +51,8 @@ module.exports = class RxP
 
         @_makeSerial()
 
-    @reject: (reason) -> new RxP(reason, true)
-    @defer:  (v) -> new RxP(INI)._defer(v)
+    @reject: (reason) -> new X(reason, true)
+    @defer:  (v) -> new X(INI)._defer(v)
 
     isPending:   -> not @_isEnded
     isEnded:     -> @_isEnded
@@ -232,7 +232,7 @@ stepWith = (type, resolver, twoF, finish) -> (opts, fx, fe) ->
         opts = null
     fx = unitFx unless fx
     fe = unitFe unless !twoF or fe
-    p = new RxP(INI)
+    p = new X(INI)
     p._type = type
     p._resolver = resolver
     p._fx = fx
@@ -246,14 +246,14 @@ stepWith = (type, resolver, twoF, finish) -> (opts, fx, fe) ->
 thenResolver   = makeResolver false
 failResolver   = makeResolver true
 alwaysResolver = makeResolver ALWAYS
-RxP::then    = RxP::map   = stepWith 'then', thenResolver, true
-RxP::fail    = RxP::catch = stepWith 'fail', failResolver
-RxP::always  = RxP::fin = RxP::finally = stepWith 'always', alwaysResolver
+X::then    = X::map   = stepWith 'then', thenResolver, true
+X::fail    = X::catch = stepWith 'fail', failResolver
+X::always  = X::fin = X::finally = stepWith 'always', alwaysResolver
 # internal always-resolver to not confuse things
-RxP::_always = stepWith '[always]', alwaysResolver
+X::_always = stepWith '[always]', alwaysResolver
 
 # spread is like then
-RxP::spread = stepWith 'spread', (fx, fe, v, isError, cb) ->
+X::spread = stepWith 'spread', (fx, fe, v, isError, cb) ->
     # presumably we use spread to unpack an array in v, but we handle
     # single values too.
     argv = if Array.isArray(v) then v else [v]
@@ -266,7 +266,7 @@ doneResolver = (fx, fe, v, isError, cb) ->
         fe = -> nextTick -> throw (if v instanceof Error then v else new Error(v))
         fe = process.domain.bind(fe) if process?.domain?
     return thenResolver.call this, fx, fe, v, isError, cb
-RxP::done = stepWith 'done', doneResolver, true, true
+X::done = stepWith 'done', doneResolver, true, true
 
 # forEach emits array elements one by one
 forEachResolver = (fx, fe, v, isError, cb) ->
@@ -298,7 +298,7 @@ forEachResolver = (fx, fe, v, isError, cb) ->
         return true
     else
         return thenResolver.call this, fx, fe, v, isError, cb
-RxP::forEach = stepWith 'forEach', forEachResolver
+X::forEach = stepWith 'forEach', forEachResolver
 
 # methods with serial version where arguments are _exec one by one.
 SERIAL = ['then', 'fail', 'always', 'spread', 'forEach']
@@ -306,7 +306,7 @@ SERIAL = ['then', 'fail', 'always', 'spread', 'forEach']
 # Recursively unwrap the given value. Callback when we got to the
 # bottom of it.
 unwrap = (v, isError, cb, ended = true) ->
-    if v instanceof RxP
+    if v instanceof X
         v._always immediate:true, (v, isError) ->
             unwrap v, isError, cb, false
             return null # important or we get endless loops
