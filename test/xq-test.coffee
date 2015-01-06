@@ -710,7 +710,7 @@ describe 'X', ->
                 done() if n == 3
             .done()
 
-        it.only 'releases the original if a deferred value is truthy', (done) ->
+        it 'releases the original if a deferred value is truthy', (done) ->
 
             n = 0
             ref = [1, 'a', true, {}]
