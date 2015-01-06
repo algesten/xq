@@ -120,7 +120,16 @@ describe 'RxP', ->
             def.promise.done (->), (v) ->
                 v.should.eql 'fail'
                 done()
-            def.reject('fail')
+            later -> def.reject('fail')
+
+        it 'works fine with deep errors', (done) ->
+
+            RxP().then ->
+                throw new Error('fail')
+            .fail (v) ->
+                throw v
+            .done (->), (v) ->
+                done()
 
     describe '.then', ->
 
@@ -602,7 +611,7 @@ describe 'RxP', ->
                     f.should.have.been.calledThrice
                 done() if v == 2
             .done()
-            later -> def.resolve(4)
+            later -> def.resolve(1)
             null
 
         it 'has a serial version of .always', (done) ->
@@ -629,7 +638,7 @@ describe 'RxP', ->
                     f.should.have.been.calledThrice
                 done() if v == 2
             .done()
-            later -> def.resolve(4)
+            later -> def.resolve(1)
             null
 
         it 'has a serial version of .spread', (done) ->
@@ -654,7 +663,7 @@ describe 'RxP', ->
                     f.should.have.been.calledThrice
                 done() if v == 2
             .done()
-            later -> def.resolve(4)
+            later -> def.resolve(1)
             null
 
     describe '.onEnd', ->
