@@ -24,10 +24,15 @@ module.exports = class RxP
     _prev:      null     # the previous promise in a chain
     _next:      null     # the next promises in a chain
     _execCount: 0        # number of (unresolved) executing events.
+    _serial:    false    # whether events are @_exec serialized
+    _head:      null     # head of linked list of events to execute (in serial mode)
+    _tail:      null     # tail of linked list of events to execute (in serial mode)
+    _onEnd:     null     # array of listeners to stream end
 
     inspect: ->
         v = if @_value == INI then '_' else @_value + ''
-        "{#{@_type}#{@_cnt}: v:#{v}, err:#{@_isError}, end:#{@_isEnded}, exec:#{@_execCount}}"
+        "{#{@_type}#{@_cnt}: v:#{v}, err:#{@_isError}, "+
+        "end:#{@_isEnded}, exec:#{@_execCount}, ser:#{@_serial}}"
 
     constructor: (v) ->
         return new RxP(v) unless this instanceof RxP
@@ -43,6 +48,8 @@ module.exports = class RxP
             @_value   = v
             @_isError = a if typeof (a = arguments[1]) == 'boolean'
             @_isEnded = v != INI
+
+        @_makeSerial()
 
     @reject: (reason) -> new RxP(reason, true)
     @defer:  (v) -> new RxP(INI)._defer(v)
@@ -72,14 +79,17 @@ module.exports = class RxP
     _reject:    (e) => @_pushError(e)._end()
     _end:           => @_exec FIN, false
 
-    _exec: (v, isError) ->
+    _exec: (v, isError, fromQueue) ->
 #        console.log 'exec', v, isError, @inspect()
         # no more pushing to finished value
-        return this if @_isEnded or @_isEnding
-        # last value sets isEnded and is propagated
+        return this if @_isEnded or (@_isEnding and !fromQueue)
+         # last value sets isEnded and is propagated
         if v == FIN
             @_isEnding = true
-            if @_execCount == 0 then @_doEnd() else @_doEndOnResolverExit = true
+            if @_execCount == 0 and !@_head?.next then @_doEnd() else @_enqueue FIN, false
+            return this
+        if @_serial and @_execCount > 0
+            @_enqueue v, isError
             return this
         @_execCount++
         unless @_resolver @_fx, @_fe, v, isError, @_resolverExit, @_resolverErr
@@ -87,26 +97,45 @@ module.exports = class RxP
             @_resolverExit v, isError
         this
 
+    # enqueue event in linked list
+    _enqueue: (v, isError) ->
+#        console.log '_enqueue', v, isError
+        unless @_head
+            @_head = next:null
+            @_tail = @_head
+        @_tail = @_tail.next = {next:null,v,isError}
+
+    # pick head of linked list of events
+    _nextEvent: ->
+        return null unless @_head and @_head.next
+        return @_head = @_head.next
+
+    # queues the next event for execution in nextTick.
+    _execNext: ->
+        if @_execCount == 0 and next = @_nextEvent()
+            nextTick => @_exec next.v, next.isError, true
+        return this
+
     # the no op resolver is default
-    _resolver: (fx, fe, v, isError, cb) ->
+    _resolver: (fx, fe, v, isError, cb, ce) ->
 #        console.log '_resolver', v, isError, @inspect()
         # root resolver does unwrap
         unwrap v, isError, cb
         return true
 
     # decreases exec count and sets the value.
-    _resolverExit: (v, isErr) => # deliberate bind
-#        console.log 'resolverExit', v, isErr, @inspect()
-        @_execCount--
-        @_setValue v, isErr
-        @_doEnd() if @_doEndOnResolverExit and @_execCount == 0
+    _resolverExit: (v, isError, ended) => # deliberate bind
+#        console.log 'resolverExit', v, isError, ended, @inspect()
+        @_execCount-- if ended
+        @_setValue v, isError
+        @_execNext()
 
     # exit resolver with an error
-    _resolverErr: (err) =>
-#        console.log 'resolverErr', v, @inspect()
-        @_execCount--
+    _resolverErr: (err, _, ended) =>
+#        console.log 'resolverErr', err, true, ended, @inspect()
+        @_execCount-- if ended
         @_setValue err, true
-        @_doEnd() if @_doEndOnResolverExit and @_execCount == 0
+        @_execNext()
 
     # does the actual ending of a promise. may be called deferred if
     # promise is waiting to resolve.
@@ -114,12 +143,14 @@ module.exports = class RxP
 #        console.log 'doEnd', @inspect()
         @_isEnded = true
         @_prev?._removeNext this
+        # invoke on end listeners
+        safeCall f, this for f in @_onEnd if @_onEnd
         @_forward FIN, false
         return this
 
     # sets the value and propagates to chained promises
     _setValue: (v, isError) ->
-#        console.log 'setValue', v, @inspect()
+#        console.log 'setValue', v, isError, @inspect()
         # ended takes no more values and NVA is emitted from some
         # resolver to indicate no value.
         return this if @_isEnded or v == NVA
@@ -130,7 +161,7 @@ module.exports = class RxP
     # propagates the given value/error to chained promises _exec
     # functions.
     _forward: (v, isError) ->
-#        console.log 'forward', v, isError, @_next, @inspect()
+#        console.log 'forward', v, isError, @inspect()
         return this unless @_next?.length
         @_next.forEach (n) -> n._exec v, isError
         this
@@ -152,6 +183,24 @@ module.exports = class RxP
         @_next.splice i, 1 if i = @_next.indexOf(n) >= 0
         this
 
+    # synthesize .serial versions
+    _makeSerial: ->
+        SERIAL.forEach (f) =>
+            @[f].serial = (fx, fe) => @[f].call this, serial:true, fx, fe
+        this
+
+    # adds an on end listener.
+    onEnd: (f) ->
+        @_onEnd = [] unless @_onEnd
+        @_onEnd.push f
+        this
+
+
+safeCall = (f, v) ->
+    try
+        f(v)
+    catch err
+        # bad
 
 # mode for finally/fin/always
 ALWAYS = {always:0}
@@ -173,16 +222,25 @@ makeResolver = (mode) -> (fx, fe, v, isError, cb, ce) ->
             throw new TypeError('f returned same promise') if r == _this
             unwrap r, false, cb
         catch err
-            ce err
+            unwrap err, true, ce
     return true
 
 # Makes a new promise chained off this with given resolver.
-stepWith = (type, resolver, twoF, finish) -> (fx,fe) ->
+unitFx = (x) -> x
+unitFe = (e) -> throw e
+stepWith = (type, resolver, twoF, finish) -> (opts, fx, fe) ->
+    unless typeof opts == 'object'
+        fe = fx
+        fx = opts
+        opts = null
+    fx = unitFx unless fx
+    fe = unitFe unless !twoF or fe
     p = new RxP(INI)
     p._type = type
     p._resolver = resolver
     p._fx = fx
     p._fe = fe if twoF
+    p._serial = !!opts?.serial
     @_addNext p
     return if finish then undefined else p
 
@@ -212,61 +270,41 @@ doneResolver = (fx, fe, v, isError, cb, ce) ->
     return thenResolver.call this, fx, fe, v, isError, cb, ce
 RxP::done = stepWith 'done', doneResolver, true, true
 
-
-RxP::_serialEnqueue = (fx, fe, v, isError, cb, ce) ->
-    unless s = @_serial
-        s = @_serial =
-            head: head = task: undefined, next:null
-            tail: head
-    _this = this
-    wrap = (c) -> (v, isError) ->
-        c v, isError
-        _this._serialNext()
-    s.tail = s.tail.next =
-        task: [fx, fe, v, isError, wrap(cb), wrap(ce)]
-        next: null
-
-RxP::_serialNext = ->
-    s = @_serial
-    return false unless s.head.next
-    s.head = s.head.next
-    task = s.head.task
-    s.head.task = null
-    unless thenResolver.apply this, task
-        # unhandled values must be set
-        @_resolverExit task[2], task[3]
-    return true
-
-serialResolver = (fx, fe, v, isError, cb, ce) ->
-    @_serialEnqueue fx, fe, v, isError, cb, ce
-    @_serialNext()
-    return true
-
-RxP::serial = stepWith 'serial', serialResolver, true
-
+# forEach emits array elements one by one
 forEachResolver = (fx, fe, v, isError, cb, ce) ->
     if !isError and Array.isArray v
         # zero length array means we emit no value down the chain.
         if v.length == 0
-            cb NVA, false
+            cb NVA, false, true
             return true
-        # increase exec count with the amount of values we intend to
-        # emit -1 for the one already counted up when entering _exec.
-        @_execCount += (v.length - 1)
-        for x in v
-            unless thenResolver.call(this, fx, fe, x, false, cb, ce)
-                do (x) -> nextTick -> cb x, false
+        if @_serial
+            # enqueue the events
+            @_enqueue x, false for x in v
+            # fire them off one by one
+            cb NVA, false, true
+        else
+            # increase exec count with the amount of values we intend to
+            # emit -1 for the one already counted up when entering _exec.
+            @_execCount += (v.length - 1)
+            for x in v
+                unless thenResolver.call(this, fx, fe, x, false, cb, ce)
+                    do (x) -> nextTick -> unwrap x, false, cb
         return true
     else
         return thenResolver.call this, fx, fe, v, isError, cb, ce
 RxP::forEach = stepWith 'forEach', forEachResolver
 
+# methods with serial version where arguments are _exec one by one.
+SERIAL = ['then', 'fail', 'always', 'spread', 'forEach']
+
 # Recursively unwrap the given value. Callback when we got to the
 # bottom of it.
-unwrap = (v, isError, cb) ->
+unwrap = (v, isError, cb, ended = true) ->
     if v instanceof RxP
+        lastV = lastisError = undefined
         v._always (v, isError) ->
-            unwrap v, isError, cb
+            unwrap v, isError, cb, false
             return null # important or we get endless loops
+        v.onEnd -> unwrap NVA, false, cb, ended
     else
-        cb v, isError
+        cb v, isError, ended

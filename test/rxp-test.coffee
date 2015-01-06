@@ -546,7 +546,7 @@ describe 'RxP', ->
                 done() if v == 3
             .done()
 
-        it 'is special because defereds are not resolved before pushed down chain', ->
+        it 'is possible to receive unresolved referreds', (done) ->
 
             def = RxP.defer()
             c = 0
@@ -559,15 +559,121 @@ describe 'RxP', ->
                     v.should.eql 2
                 c++
                 v
+                # exit of forEach unwraps deferred
+            .then f = spy (v) ->
+                if v == 1
+                    f.should.have.been.calledThrice
+                    done()
             .done()
+            later -> def.resolve(1)
 
-    describe.skip '.serial', ->
+    describe '.[step].serial', ->
 
-        it 'stalls on any given promise and buffers additional event', (done) ->
+        it 'has a serial version of .forEach', (done) ->
 
             def = RxP.defer()
             c = 0
-            RxP([0,def.promise,2]).forEach().serial (v) ->
+            RxP([0,def.promise,2]).forEach.serial().then (v) ->
                 v.should.eql c++
                 done() if v == 2
             .done()
+            later -> def.resolve(1)
+            null
+
+        it 'has a serial version of .then', (done) ->
+
+            def = null
+            c = 0
+            RxP([0,1,2]).forEach().then.serial f = spy (v) ->
+                if v == 1
+                    (def = RxP.defer()).promise
+                else
+                    v
+            .then (v) ->
+                v.should.eql c++
+                if v == 0
+                    f.should.have.been.calledOnce
+                if v == 1
+                    f.should.have.been.calledTwice
+                if v == 3
+                    f.should.have.been.calledThrice
+                done() if v == 2
+            .done()
+            later -> def.resolve(4)
+            null
+
+        it 'has a serial version of .fail', (done) ->
+
+            def = null
+            c = 0
+            RxP([0,1,2]).forEach (v) ->
+                throw v
+            .fail.serial f = spy (v) ->
+                if v == 1
+                    (def = RxP.defer()).promise
+                else
+                    v
+            .then (v) ->
+                v.should.eql c++
+                if v == 0
+                    f.should.have.been.calledOnce
+                if v == 1
+                    f.should.have.been.calledTwice
+                if v == 3
+                    f.should.have.been.calledThrice
+                done() if v == 2
+            .done()
+            later -> def.resolve(4)
+            null
+
+        it 'has a serial version of .always', (done) ->
+
+            def = null
+            c = 0
+            RxP([0,1,2]).forEach (v) ->
+                if v == 1
+                    throw v
+                else
+                    v
+            .always.serial f = spy (v) ->
+                if v == 1
+                    (def = RxP.defer()).promise
+                else
+                    v
+            .then (v) ->
+                v.should.eql c++
+                if v == 0
+                    f.should.have.been.calledOnce
+                if v == 1
+                    f.should.have.been.calledTwice
+                if v == 3
+                    f.should.have.been.calledThrice
+                done() if v == 2
+            .done()
+            later -> def.resolve(4)
+            null
+
+        it 'has a serial version of .spread', (done) ->
+
+            def = null
+            c = 0
+            RxP([0,1,2]).forEach (v) ->
+                [v,v]
+            .spread.serial f = spy (v1, v2) ->
+                v1.should.eql v2
+                if v1 == 1
+                    (def = RxP.defer()).promise
+                else
+                    v1
+            .then (v) ->
+                v.should.eql c++
+                if v == 0
+                    f.should.have.been.calledOnce
+                if v == 1
+                    f.should.have.been.calledTwice
+                if v == 3
+                    f.should.have.been.calledThrice
+                done() if v == 2
+            .done()
+            later -> def.resolve(4)
+            null
