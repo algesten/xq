@@ -22,19 +22,22 @@ p.spread(fx)
 p.all([] or {})
 ## p.val()
 
-p.filter(fx)(x)
 p.forEach(fx)(x)
+
+p.then serial:true, (v) ->
+p.then.serial (v) ->
+
+p.filter(fx)(x)
 
 p.delay(n)
 p.throttle(n)
 p.debounce([immed], n)
-p.timeout
 
 p.scan
 p.fold/reduce
 p.diff
 p.zip
 
-
-p.then serial:true, (v) ->
-p.then.serial (v) ->
+p.any
+p.every
+p.some
