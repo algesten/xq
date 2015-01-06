@@ -79,27 +79,27 @@ module.exports = class RxP
     _reject:    (e) => @_pushError(e)._end()
     _end:           => @_exec FIN, false
 
-    _exec: (v, isError, fromQueue) ->
+    _exec: (v, isError, fromQueue) -> # deliberate bind
 #        console.log 'exec', v, isError, @inspect()
         # no more pushing to finished value
         return this if @_isEnded or (@_isEnding and !fromQueue)
          # last value sets isEnded and is propagated
         if v == FIN
             @_isEnding = true
-            if @_execCount == 0 and !@_head?.next then @_doEnd() else @_enqueue FIN, false
+            @_doEnd() if @_execCount == 0 and !@_head?.next
             return this
         if @_serial and @_execCount > 0
             @_enqueue v, isError
             return this
         @_execCount++
-        unless @_resolver @_fx, @_fe, v, isError, @_resolverExit, @_resolverErr
+        unless @_resolver @_fx, @_fe, v, isError, @_resolverExit
             # resolver did not handle the value => set incoming
             @_resolverExit v, isError
         this
 
     # enqueue event in linked list
     _enqueue: (v, isError) ->
-#        console.log '_enqueue', v, isError
+#        console.log '_enqueue', v, isError, @inspect()
         unless @_head
             @_head = next:null
             @_tail = @_head
@@ -113,11 +113,11 @@ module.exports = class RxP
     # queues the next event for execution in nextTick.
     _execNext: ->
         if @_execCount == 0 and next = @_nextEvent()
-            nextTick => @_exec next.v, next.isError, true
+            @_exec next.v, next.isError, true
         return this
 
     # the no op resolver is default
-    _resolver: (fx, fe, v, isError, cb, ce) ->
+    _resolver: (fx, fe, v, isError, cb) ->
 #        console.log '_resolver', v, isError, @inspect()
         # root resolver does unwrap
         unwrap v, isError, cb
@@ -128,13 +128,7 @@ module.exports = class RxP
 #        console.log 'resolverExit', v, isError, ended, @inspect()
         @_execCount-- if ended
         @_setValue v, isError
-        @_execNext()
-
-    # exit resolver with an error
-    _resolverErr: (err, _, ended) =>
-#        console.log 'resolverErr', err, true, ended, @inspect()
-        @_execCount-- if ended
-        @_setValue err, true
+        @_doEnd() if @_isEnding and @_execCount == 0 and !@_head?.next
         @_execNext()
 
     # does the actual ending of a promise. may be called deferred if
@@ -144,7 +138,7 @@ module.exports = class RxP
         @_isEnded = true
         @_prev?._removeNext this
         # invoke on end listeners
-        safeCall f, this for f in @_onEnd if @_onEnd
+        (safeCall f, this for f in @_onEnd) if @_onEnd
         @_forward FIN, false
         return this
 
@@ -191,8 +185,10 @@ module.exports = class RxP
 
     # adds an on end listener.
     onEnd: (f) ->
+#        console.log 'onEnd', @inspect()
         @_onEnd = [] unless @_onEnd
         @_onEnd.push f
+        safeCall f, this if @_isEnded
         this
 
 
@@ -209,20 +205,21 @@ ALWAYS = {always:0}
 nextTick = require './nexttick'
 
 # Creates .then-style resolvers (then, fail, always).
-makeResolver = (mode) -> (fx, fe, v, isError, cb, ce) ->
+makeResolver = (mode) -> (fx, fe, v, isError, cb) ->
     f = if mode == ALWAYS or mode == isError
         fx
     else if mode == false and isError == true
         fe
     return false unless f
     _this = this
-    nextTick ->
+    schedule = if @_immediate then (task) -> task() else nextTick
+    schedule ->
         try
             r = f.apply undefined, if mode == ALWAYS then [v, isError] else [v]
             throw new TypeError('f returned same promise') if r == _this
             unwrap r, false, cb
         catch err
-            unwrap err, true, ce
+            unwrap err, true, cb
     return true
 
 # Makes a new promise chained off this with given resolver.
@@ -241,6 +238,7 @@ stepWith = (type, resolver, twoF, finish) -> (opts, fx, fe) ->
     p._fx = fx
     p._fe = fe if twoF
     p._serial = !!opts?.serial
+    p._immediate = !!opts?.immediate
     @_addNext p
     return if finish then undefined else p
 
@@ -255,43 +253,51 @@ RxP::always  = RxP::fin = RxP::finally = stepWith 'always', alwaysResolver
 RxP::_always = stepWith '[always]', alwaysResolver
 
 # spread is like then
-RxP::spread = stepWith 'spread', (fx, fe, v, isError, cb, ce) ->
+RxP::spread = stepWith 'spread', (fx, fe, v, isError, cb) ->
     # presumably we use spread to unpack an array in v, but we handle
     # single values too.
     argv = if Array.isArray(v) then v else [v]
     f = -> fx.apply undefined, argv
-    return thenResolver.call this, f, undefined, v, isError, cb, ce
+    return thenResolver.call this, f, undefined, v, isError, cb
 
 # done method is special, because it bubbles any exceptions.
-doneResolver = (fx, fe, v, isError, cb, ce) ->
+doneResolver = (fx, fe, v, isError, cb) ->
     if isError and not fe
         fe = -> nextTick -> throw (if v instanceof Error then v else new Error(v))
         fe = process.domain.bind(fe) if process?.domain?
-    return thenResolver.call this, fx, fe, v, isError, cb, ce
+    return thenResolver.call this, fx, fe, v, isError, cb
 RxP::done = stepWith 'done', doneResolver, true, true
 
 # forEach emits array elements one by one
-forEachResolver = (fx, fe, v, isError, cb, ce) ->
+forEachResolver = (fx, fe, v, isError, cb) ->
     if !isError and Array.isArray v
         # zero length array means we emit no value down the chain.
         if v.length == 0
             cb NVA, false, true
             return true
-        if @_serial
-            # enqueue the events
-            @_enqueue x, false for x in v
-            # fire them off one by one
-            cb NVA, false, true
-        else
+        arr = v.slice(0)
+        _this = this
+        if !_this._serial
             # increase exec count with the amount of values we intend to
             # emit -1 for the one already counted up when entering _exec.
-            @_execCount += (v.length - 1)
-            for x in v
-                unless thenResolver.call(this, fx, fe, x, false, cb, ce)
-                    do (x) -> nextTick -> unwrap x, false, cb
+            @_execCount += (arr.length - 1)
+        do takeOne = ->
+            if arr.length == 0
+                # kick off the serial mode pick
+                cb NVA, false, true if _this._serial
+                return
+            x = arr.shift()
+            unwrap x, false, (v, isError) ->
+                return if v == NVA
+                if _this._serial
+                    _this._enqueue v, isError
+                else
+                    unless thenResolver.call _this, fx, fe, v, isError, cb
+                        cb v, isError, false
+                takeOne()
         return true
     else
-        return thenResolver.call this, fx, fe, v, isError, cb, ce
+        return thenResolver.call this, fx, fe, v, isError, cb
 RxP::forEach = stepWith 'forEach', forEachResolver
 
 # methods with serial version where arguments are _exec one by one.
@@ -301,8 +307,7 @@ SERIAL = ['then', 'fail', 'always', 'spread', 'forEach']
 # bottom of it.
 unwrap = (v, isError, cb, ended = true) ->
     if v instanceof RxP
-        lastV = lastisError = undefined
-        v._always (v, isError) ->
+        v._always immediate:true, (v, isError) ->
             unwrap v, isError, cb, false
             return null # important or we get endless loops
         v.onEnd -> unwrap NVA, false, cb, ended

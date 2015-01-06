@@ -6,7 +6,7 @@ chai.use(require 'sinon-chai')
 
 RxP = require '../src/rxp'
 
-later = (f) -> setTimeout f, 1
+later = (f) -> setTimeout f, 5
 
 describe 'RxP', ->
 
@@ -546,27 +546,6 @@ describe 'RxP', ->
                 done() if v == 3
             .done()
 
-        it 'is possible to receive unresolved referreds', (done) ->
-
-            def = RxP.defer()
-            c = 0
-            RxP([0,def.promise,2]).forEach (v) ->
-                if c == 0
-                    v.should.eql 0
-                else if c == 1
-                    v.isPending().should.be.true
-                else if c == 2
-                    v.should.eql 2
-                c++
-                v
-                # exit of forEach unwraps deferred
-            .then f = spy (v) ->
-                if v == 1
-                    f.should.have.been.calledThrice
-                    done()
-            .done()
-            later -> def.resolve(1)
-
     describe '.[step].serial', ->
 
         it 'has a serial version of .forEach', (done) ->
@@ -599,7 +578,7 @@ describe 'RxP', ->
                     f.should.have.been.calledThrice
                 done() if v == 2
             .done()
-            later -> def.resolve(4)
+            later -> def.resolve(1)
             null
 
         it 'has a serial version of .fail', (done) ->
@@ -677,3 +656,23 @@ describe 'RxP', ->
             .done()
             later -> def.resolve(4)
             null
+
+    describe '.onEnd', ->
+
+        it 'is called when stream ends for promises', (done) ->
+
+            RxP().onEnd -> done()
+
+        it 'is called for deferred promise', (done) ->
+
+            (def = RxP.defer()).promise.onEnd -> done()
+            later -> def.resolve 1
+
+        it 'waits until end of stream', (done) ->
+
+            (def = RxP.defer()).promise.onEnd f = spy -> done()
+            later -> def.push 0
+            later -> def.push 1
+            later -> def.push 2
+            later -> f.should.not.have.been.calledOnce
+            later -> def.end()
