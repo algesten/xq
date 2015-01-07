@@ -21,25 +21,26 @@
     "chai": "^1.10.0",
     "coffee-script": "^1.8.0",
     "mocha": "^2.1.0",
+    "q": "^1.1.2",
     "sinon": "^1.12.2",
     "sinon-chai": "^2.6.0"
   },
-  "dependencies": {
-  },
-  "keywords":
-   [ "xq",
-     "promise",
-     "promises",
-     "promises-a",
-     "promises-aplus",
-     "deferred",
-     "future",
-     "async",
-     "linq",
-     "frp",
-     "reactive",
-     "events",
-     "q",
-     "rx",
-     "rxjs"]
+  "dependencies": {},
+  "keywords": [
+    "xq",
+    "promise",
+    "promises",
+    "promises-a",
+    "promises-aplus",
+    "deferred",
+    "future",
+    "async",
+    "linq",
+    "frp",
+    "reactive",
+    "events",
+    "q",
+    "rx",
+    "rxjs"
+  ]
 }

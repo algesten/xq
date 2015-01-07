@@ -3,6 +3,7 @@ expect = chai.expect
 chai.should()
 chai.use(require 'sinon-chai')
 { assert, spy, match, mock, stub, sandbox } = require 'sinon'
+Q = require 'q'
 
 X = require '../src/xq'
 
@@ -739,3 +740,78 @@ describe 'X', ->
                 err.should.eql 'fail'
                 done()
             .done()
+
+    describe 'other then-able', ->
+
+        it 'can wrap another resolved then-able', (done) ->
+
+            X(Q(42)).then (v) ->
+                v.should.eql 42
+                done()
+            .done()
+
+        it 'can wrap another rejected then-able', (done) ->
+
+            X(Q.reject(42)).fail (v) ->
+                v.should.eql 42
+                done()
+            .done()
+            null
+
+        it 'can wrap as deferred and resolve', (done) ->
+
+            X((def = Q.defer()).promise).then (v) ->
+                v.should.eql 42
+                done()
+            .done()
+            later -> def.resolve 42
+
+        it 'can wrap as deferred and reject', (done) ->
+
+            X((def = Q.defer()).promise).fail (v) ->
+                v.should.eql 42
+                done()
+            .done()
+            later -> def.reject 42
+
+        it 'can receive as result in .then', (done) ->
+
+            X().then (v) ->
+                Q(42)
+            .then (v) ->
+                v.should.eql 42
+                done()
+            .done()
+
+        it 'can receive as rejected result in .then', (done) ->
+
+            X().then (v) ->
+                Q.reject(42)
+            .fail (v) ->
+                v.should.eql 42
+                done()
+            .done()
+
+        it 'can receive as deferred in .then', (done) ->
+
+            def = null
+            X().then (v) ->
+                def = Q.defer()
+                def.promise
+            .then (v) ->
+                v.should.eql 42
+                done()
+            .done()
+            later -> def.resolve 42
+
+        it 'can receive as rejected deferred in .then', (done) ->
+
+            def = null
+            X().then (v) ->
+                def = Q.defer()
+                def.promise
+            .fail (v) ->
+                v.should.eql 42
+                done()
+            .done()
+            later -> def.reject 42

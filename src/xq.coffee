@@ -43,6 +43,10 @@ module.exports = class X
             # We chain ourselves to the given promise.
             # I.e. X(X(42)) is the same value as X(42).
             v._addNext this
+        else if isThenable v
+            @_value = INI
+            _this = this
+            v.then ((x) -> _this._resolve(x)), ((e) -> _this._reject(e))
         else
             # Given a real value, we are already resolved.
             @_value   = v
@@ -191,12 +195,15 @@ module.exports = class X
         safeCall f, this if @_isEnded
         this
 
-
+# to call a method and ignore errors
 safeCall = (f, v) ->
     try
         f(v)
     catch err
         # bad
+
+# test if the given object is .thenable
+isThenable = (o) -> typeof o?.then == 'function'
 
 # mode for finally/fin/always
 ALWAYS = {always:0}
@@ -328,5 +335,7 @@ unwrap = (v, isError, cb, ended = true) ->
             unwrap v, isError, cb, false
             return null # important or we get endless loops
         v.onEnd -> unwrap NVA, false, cb, ended
+    else if isThenable v
+        v.then ((x) -> unwrap x, false, cb, ended), ((e) -> unwrap e, true, cb, ended)
     else
         cb v, isError, ended
