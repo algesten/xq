@@ -200,7 +200,7 @@ something rx-people call `flatMap`.
 
 `Q(42).then((v) -> Q(2*v)).then (v) -> ...v is 84`
 
-`Bacon.once(42).map((v) -> Bacon.once(2*v)).flatMap (v) -> ...v is 84`
+`Bacon.once(42).map((v) -> Bacon.once(2*v)).flatMap().onValue (v) -> ...v is 84`
 
 For promises we continue a chain with `.then .then .then`. It doesn't
 matter whether the returned value in a step is a promise for a value
