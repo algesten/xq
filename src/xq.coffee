@@ -56,7 +56,19 @@ module.exports = class X
         @_makeSerial()
 
     @reject: (reason) -> new X(reason, true)
-    @defer:  (v) -> new X(INI)._defer(v)
+
+    @resolver: (resolver) ->
+        def = (new X(INI))._defer()
+        resolver(((v) -> def.resolve(v)),((e) -> def.reject(e)))
+        return def.promise
+
+    @binder: (binder) ->
+        def = (new X(INI))._defer()
+        unsub = binder (v, isError) -> if isError then def.pushError v else def.push v
+        def.promise.onEnd unsub if typeof unsub == 'function'
+        return def.promise
+
+    @defer: (v) -> new X(INI)._defer(v)
 
     isPending:   -> not @_isEnded
     isEnded:     -> @_isEnded

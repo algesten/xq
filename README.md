@@ -104,6 +104,12 @@ equivalent.
   `def.push(v); def.end()`.
 * **X.reject(v)** creates an instance that is rejected with value
   `v`. Equivalent to `def.pushError(v); def.end()`.
+* **X.resolver(f)** `f` is synchronously called with `resolve, reject` which are functions
+  used to resolve/reject the promise. `X.resolve((resolve, reject) -> ... resolve(42))`
+* **X.binder(f)** `f` is synchronously called with a `sink` function. The function is used to
+  sink events/errors. The signature of the sink function is `(v, isErr) ->`.
+  `X.binder((sink) -> ... sink(42)... sink(err,true)`. `f` can optionally return
+  an unsubscribe function which will be called when the event stream ends.
 * **def = X.defer()** creates a deferred value `def`.
 * **def.resolve(v)** to resolve the deferred with value `v`.
 * **def.reject(e)** to reject the deferred with reason `e`.

@@ -90,6 +90,66 @@ describe 'X', ->
             def = X.defer()
             def.promise.isEnded().should.eql false
 
+    describe '.resolver', (done) ->
+
+        it 'is used to create a resolve a promise resolved by a function', (done) ->
+
+            X.resolver (resolve, reject) ->
+                later -> resolve(42)
+            .then (v) ->
+                v.should.eql 42
+                done()
+            .done()
+
+        it 'is used to create a resolve a promise rejected by a function', (done) ->
+
+            X.resolver (resolve, reject) ->
+                later -> reject(42)
+            .fail (v) ->
+                v.should.eql 42
+                done()
+            .done()
+
+    describe '.binder', (done) ->
+
+        it 'is used to bind an event emitter using a sink function', (done) ->
+
+            c = 42
+            X.binder (sink) ->
+                later -> sink 42
+                later -> sink 43
+                later -> sink 44
+            .then (v) ->
+                v.should.eql c++
+                done() if v == 44
+            .done()
+
+        it 'is possible to use sink function to emit errors', (done) ->
+
+            c = 42
+            X.binder (sink) ->
+                later -> sink 42, true
+                later -> sink 43, true
+                later -> sink 44, true
+            .fail (v) ->
+                v.should.eql c++
+                done() if v == 44
+            .done()
+
+        it 'can optionally return an unsubscribe function', (done) ->
+
+            c = 42
+            p = X.binder (sink) ->
+                later -> sink 42
+                later -> sink 43
+                later -> sink 44
+                -> done()
+
+            p.then (v) -> v.should.eql c++
+
+            # XXX internal API. how do we expose this?
+            p._defer().end()
+
     describe 'errors', ->
 
         it 'are silently consumed', ->
