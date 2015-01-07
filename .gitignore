@@ -19,3 +19,5 @@ public
 \#*
 bower_components
 doc
+
+lib/xq.js

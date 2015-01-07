@@ -5,7 +5,7 @@
   "main": "lib/xq.js",
   "scripts": {
     "test": "mocha",
-    "prepublish": "coffee -c -o lib src/xq.coffee"
+    "prepublish": "coffee -c -o lib src"
   },
   "repository": {
     "type": "git",
