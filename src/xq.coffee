@@ -305,7 +305,7 @@ forEachResolver = (fx, fe, v, isError, cb) ->
         return true
     else
         return thenResolver.call this, fx, fe, v, isError, cb
-X::forEach = stepWith 'forEach', forEachResolver
+X::forEach = X::each = stepWith 'forEach', forEachResolver
 
 # resolver to handle .filter (x) ->. if returned value is truthy,
 # value is released down the chain.

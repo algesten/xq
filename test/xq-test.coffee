@@ -556,6 +556,11 @@ describe 'X', ->
                 done() if v == 3
             .done()
 
+        it 'is aliased to each', ->
+
+            X::forEach.should.equal X::each
+
+
     describe '.[step].serial', ->
 
         it 'has a serial version of .forEach', (done) ->

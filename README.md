@@ -130,7 +130,7 @@ equivalent.
 
 ### Arrays
 
-* **p.forEach(fx)** attached `fx` to receive values. If the value is
+* **p.forEach/each(fx)** attached `fx` to receive values. If the value is
   an array, it will invoke `fx` one by one. I.e. `[a0,a1,a2]` will
   invoke `fx(a0)`, `fx(a1)`, `fx(a2)`
 * **p.spread(fx)** attaches `fx` to receive values. If the value is an
