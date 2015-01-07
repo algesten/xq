@@ -156,6 +156,16 @@ only one value is executed at a time.
 * **p.forEach.serial(fx)** attaches `fx` to receive values serially (see `p.forEach`).
 * **p.spread.serial(fx)** attaches `fx` to receive values serially (see `p.spread`).
 
+## Interoperability with other .then-ables
+
+XQ tries to play nice with other promise packages. It can both wrap and receive other promises.
+
+`X(Q(42)).then (v) -> ...42`
+
+`X().then(-> Q.reject(42)).fail (v) -> ...42`
+
+## Get it
+
 ### Download Source
 
 ```bash
