@@ -1,6 +1,8 @@
 XQ - Reactive Promises (experimental)
 =====================================
 
+[![Build Status](https://travis-ci.org/algesten/xq.svg)](https://travis-ci.org/algesten/xq)
+
 XQ is a hybrid between promises and reactive extensions. A simple
 clean API modelled on promises with the addition of event streams.
 
