@@ -398,7 +398,7 @@ allResolver = (fx, fe, v, isError, cb) ->
         return true
     return thenResolver.call this, fx, fe, v, isError, cb
 X::all = stepWith 'all', allResolver
-
+X.all = (v) -> X(v).all()
 
 # methods with serial version where arguments are _exec one by one.
 SERIAL = ['then', 'fail', 'always', 'spread', 'forEach']

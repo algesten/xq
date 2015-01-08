@@ -138,7 +138,7 @@ equivalent.
   argument is a boolean telling whether the received value was an
   error.
 
-### Arrays
+### Arrays and Objects
 
 * **p.forEach/each(fx)** attached `fx` to receive values. If the value is
   an array, it will invoke `fx` one by one. I.e. `[a0,a1,a2]` will
@@ -147,12 +147,20 @@ equivalent.
   array, the array will be destructured to arguments in
   `fx`. I.e. `[a0,a1,a2]` will invoke `fx(a0, a1, a2)`. Non-array
   values will be invoked as first argument (`f(v)`).
+* **p.all(fx)** attaches `fx` to receive resolved arrays/objects. If
+  the value to be executed is an array of promises `[p1,p2,...]`, `fx`
+  will only be invoked when all promises are resolved and will be
+  receving an array with the resolved values. For objects the function
+  inspects each top level property (no deep inspection).
+  `{a:p1,b:p2,...}` will result in an object with the resolved values
+  bound to the same keys. Any promise failing will abort and reject
+  with the error of that promise.
+* **X.all(v)** same as `X(v).all()`.
 
 ### Filtering
 
 * **p.filter(f)** apply function `f` to each value. If `f` returns a
   truthy, the original value will be released down the chain.
-
 
 ### Serialization
 

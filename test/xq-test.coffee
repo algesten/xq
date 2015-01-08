@@ -1084,3 +1084,15 @@ describe 'X', ->
             .done()
             later -> def2.reject 42
             later -> def1.reject 41
+
+        it 'is exposed as X.all', (done) ->
+
+            def1 = X.defer()
+            def2 = X.defer()
+            X.all([def1.promise, def2.promise]).spread (a0, a1) ->
+                a0.should.eql 41
+                a1.should.eql 42
+                done()
+            .done()
+            later -> def2.resolve 42
+            later -> def1.resolve 41
