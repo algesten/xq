@@ -159,13 +159,21 @@ module.exports = class X
     # does the actual ending of a promise. may be called deferred if
     # promise is waiting to resolve.
     _doEnd: => # deliberate bind
-#        console.log 'doEnd', @inspect()
+#       console.log 'doEnd', @inspect()
         @_isEnded = true
         @_prev?._removeNext this
+
+        # clear state
+        @_head = @_tail = null
+
         # invoke on end listeners
         errs = (safeCall f for f in @_onEnd) if @_onEnd
         firstErr = errs.reduce(((prev, cur) -> prev || cur), null) if errs
+
+        # forward the end
         @_forward FIN, false
+
+        # throw any errors from listeners
         throw firstErr if firstErr
         return this
 

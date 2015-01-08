@@ -125,6 +125,8 @@ equivalent.
 * **p.isPending()** tells whether the promise is pending. Equivalent to `!p.isEnded()`.
 * **p.isFulfilled()** tells whether the promise is resolved.
 * **p.isRejected()** tells whether the promise is rejected.
+* **p.onEnd(f)** will call `f` when stream is ended.
+* **p.endOnError()** makes stream stop on first encountered error.
 
 ### Chaining
 

@@ -90,6 +90,15 @@ describe 'X', ->
             def = X.defer()
             def.promise.isEnded().should.eql false
 
+    describe 'def.end()', ->
+
+        it 'is only ending the stream once', (done) ->
+
+            def = X.defer()
+            def.promise.onEnd done
+            def.end()
+            def.end()
+
     describe '.resolver', (done) ->
 
         it 'is used to create a resolve a promise resolved by a function', (done) ->
@@ -979,8 +988,8 @@ describe 'X', ->
 
         it 'stops the stream on first error', (done) ->
 
-            X([0,1,2]).forEach().then((v) -> throw v if v == 1).endOnError().fail (v) ->
-                v.should.eql 1
+            X([0,1,2]).forEach().then((v) -> throw 'fail' if v == 1).endOnError().fail (v) ->
+                v.should.eql 'fail'
                 done()
             .done()
 
@@ -988,3 +997,12 @@ describe 'X', ->
 
             x = X()
             x.should.equal x.endOnError()
+
+        it 'stops queued up events', (done) ->
+
+            X([0,1,2]).forEach.serial().then (v) ->
+                v.should.not.eql 2
+                throw 'fail' if v == 1
+                v
+            .endOnError()
+            .onEnd done
