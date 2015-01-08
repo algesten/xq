@@ -373,7 +373,7 @@ allResolver = (fx, fe, v, isError, cb) ->
         # an array
         arr = v
         val = (k) -> k
-        result = []
+        result = new Array(v.length)
         r = (k, idx, val) -> result[idx] = val
     else if typeof v == 'object' and not isDeferred(v)
         # a plain object
@@ -384,15 +384,17 @@ allResolver = (fx, fe, v, isError, cb) ->
     if arr?.reduce ((prev,cur) -> prev || isDeferred(val(cur))), false
         done = 0
         _this = this
-        firstError = false
+        stop = false
         arr.every (k, idx) -> a = val(k); unwrap a, false, (ua, isError) ->
-            return if firstError
+            return if stop
             if isError
-                firstError = true
+                stop = true
                 cb ua, true  # break on first error
                 return false # stop every
-            r k, idx, ua unless ua == NVA
+            return if ua == NVA
+            r k, idx, ua
             if arr.length == ++done
+                stop = true
                 return thenResolver.call _this, fx, fe, result, false, cb
             return true
         return true

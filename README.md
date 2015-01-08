@@ -154,7 +154,8 @@ equivalent.
   inspects each top level property (no deep inspection).
   `{a:p1,b:p2,...}` will result in an object with the resolved values
   bound to the same keys. Any promise failing will abort and reject
-  with the error of that promise.
+  with the error of that promise. For streams it ensures there is *a*
+  pushed value, it becomes a point in time view of all viewed streams.
 * **X.all(v)** same as `X(v).all()`.
 
 ### Filtering
