@@ -60,12 +60,18 @@ module.exports = class X
 
     @resolver: (resolver) ->
         def = (new X(INI))._defer()
-        resolver(((v) -> def.resolve(v)),((e) -> def.reject(e)))
+        resolver ((v) -> def.resolve(v);undefined),((e) -> def.reject(e);undefined)
         return def.promise
 
     @binder: (binder) ->
         def = (new X(INI))._defer()
-        unsub = binder (v, isError) -> if isError then def.pushError v else def.push v
+        sink = (v, isError) ->
+            if isError then def.pushError v else def.push v
+            return undefined
+        ender = ->
+            def.end()
+            return undefined
+        unsub = binder sink, ender
         def.promise.onEnd unsub if typeof unsub == 'function'
         return def.promise
 

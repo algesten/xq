@@ -110,6 +110,14 @@ describe 'X', ->
                 done()
             .done()
 
+        it 'returns undefined on both resolve/reject', (done) ->
+
+            X.resolver (resolve, reject) ->
+                expect(resolve(42)).to.be.undefined
+                expect(reject(42)).to.be.undefined
+                done()
+            .done()
+
     describe '.binder', (done) ->
 
         it 'is used to bind an event emitter using a sink function', (done) ->
@@ -136,19 +144,30 @@ describe 'X', ->
                 done() if v == 44
             .done()
 
+        it 'receives a second argument which ends the stream', (done) ->
+
+            X.binder (sink, end) ->
+                end()
+            .onEnd done
+
+        it 'returns undefined on both sink/end', (done) ->
+
+            X.binder (sink, end) ->
+                expect(sink(0)).to.be.undefined
+                expect(end()).to.be.undefined
+                done()
+
         it 'can optionally return an unsubscribe function', (done) ->
 
             c = 42
-            p = X.binder (sink) ->
+            p = X.binder (sink, end) ->
                 later -> sink 42
                 later -> sink 43
                 later -> sink 44
+                later -> end()
                 -> done()
 
             p.then (v) -> v.should.eql c++
-
-            # XXX internal API. how do we expose this?
-            p._defer().end()
 
     describe 'errors', ->
 
