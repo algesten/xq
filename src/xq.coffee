@@ -28,6 +28,7 @@ module.exports = class X
     _head:      null     # head of linked list of events to execute (in serial mode)
     _tail:      null     # tail of linked list of events to execute (in serial mode)
     _onEnd:     null     # array of listeners to stream end
+    _endOnError: false   # tells whether we stop on first error.
 
     inspect: ->
         v = if @_value == INI then '_' else @_value + ''
@@ -144,7 +145,9 @@ module.exports = class X
 #        console.log 'resolverExit', v, isError, ended, @inspect()
         @_execCount-- if ended
         @_setValue v, isError
-        @_doEnd() if @_isEnding and @_execCount == 0 and !@_head?.next
+        endingAndNoMore = @_isEnding and @_execCount == 0 and !@_head?.next
+        endingOnError = isError and @_endOnError
+        @_doEnd() if endingAndNoMore or endingOnError
         @_execNext()
 
     # does the actual ending of a promise. may be called deferred if

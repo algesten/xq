@@ -880,3 +880,32 @@ describe 'X', ->
                 done()
             .done()
             later -> def.reject 42
+
+        it 'propagates the end', (done) ->
+
+            def = Q.defer()
+            c = 0
+            p = X(def.promise).map (v) ->
+                v
+            .forEach().map (a) ->
+                a * 2
+            p.then (v) ->
+                v.should.eql c
+                c += 2
+            .done()
+            p.onEnd done
+            later -> def.resolve [0,1,2]
+
+    describe 'endOnError', ->
+
+        it 'stops the stream on first error', (done) ->
+
+            X([0,1,2]).forEach().then((v) -> throw v if v == 1).endOnError().fail (v) ->
+                v.should.eql 1
+                done()
+            .done()
+
+        it 'returns itself', ->
+
+            x = X()
+            x.should.equal x.endOnError()
