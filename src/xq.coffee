@@ -373,14 +373,20 @@ allResolver = (fx, fe, v, isError, cb) ->
         # an array
         arr = v
         val = (k) -> k
-        result = new Array(v.length)
-        r = (k, idx, val) -> result[idx] = val
+        result =  Array.apply(null, Array(v.length)).map -> NVA
+        r = (k, idx, val) ->
+            return false unless result[idx] == NVA
+            result[idx] = val
+            true
     else if typeof v == 'object' and not isDeferred(v)
         # a plain object
         arr = Object.keys(v)
         val = (k) -> v[k]
         result = {}
-        r = (k, idx, val) -> result[k] = val
+        r = (k, idx, val) ->
+            return false if result.hasOwnProperty(k)
+            result[k] = val
+            true
     if arr?.reduce ((prev,cur) -> prev || isDeferred(val(cur))), false
         done = 0
         _this = this
@@ -392,8 +398,8 @@ allResolver = (fx, fe, v, isError, cb) ->
                 cb ua, true  # break on first error
                 return false # stop every
             return if ua == NVA
-            r k, idx, ua
-            if arr.length == ++done
+            done++ if r k, idx, ua
+            if arr.length == done
                 stop = true
                 return thenResolver.call _this, fx, fe, result, false, cb
             return true

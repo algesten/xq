@@ -1097,7 +1097,7 @@ describe 'X', ->
             later -> def2.resolve 42
             later -> def1.resolve 41
 
-        it 'is a point in time value of streams', (done) ->
+        it 'takes first event value in streams', (done) ->
 
             def1 = X.defer()
             def2 = X.defer(42)
@@ -1108,3 +1108,16 @@ describe 'X', ->
             .done()
             later -> def1.push 41
             later -> def1.push 55
+
+        it 'ignores additional events to already resolved value', (done) ->
+
+            def1 = X.defer()
+            def2 = X.defer()
+            X.all([def1.promise, def2.promise]).spread (a0, a1) ->
+                a0.should.eql 41
+                a1.should.eql 42
+                done()
+            .done()
+            later -> def1.push 41
+            later -> def1.push 55
+            later -> def2.push 42
