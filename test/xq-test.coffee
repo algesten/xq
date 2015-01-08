@@ -1121,3 +1121,33 @@ describe 'X', ->
             later -> def1.push 41
             later -> def1.push 55
             later -> def2.push 42
+
+    describe '.once', ->
+
+        it 'creates a promise that takes the first value of a stream/promise', (done) ->
+
+            p = X.binder (sink) ->
+                later -> sink 42
+                later -> sink 43
+                later -> sink 44
+            .once()
+
+            p.then (v) ->
+                v.should.eql 42
+                p.isEnded().should.be.true
+                p.isFulfilled().should.be.true
+                done()
+            .done()
+
+        it 'works well with a deep nested', (done) ->
+
+            X.binder (sink) ->
+                def1 = X.defer()
+                def2 = X.defer()
+                later -> def1.push def2.promise
+                later -> def2.push 42
+                sink def1.promise
+            .once (v) ->
+                v.should.eql 42
+                done()
+            .done()

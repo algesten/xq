@@ -137,6 +137,8 @@ equivalent.
   errors. The signature for `f` is `(v, isError) ->` where the second
   argument is a boolean telling whether the received value was an
   error.
+* **p.once(fx)** picks the first event/value from a stream/promise and
+  turns that into a promise.
 
 ### Arrays and Objects
 

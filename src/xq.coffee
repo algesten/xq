@@ -160,7 +160,9 @@ module.exports = class X
     # does the actual ending of a promise. may be called deferred if
     # promise is waiting to resolve.
     _doEnd: => # deliberate bind
-#       console.log 'doEnd', @inspect()
+#        console.log 'doEnd', @inspect()
+        return this if @_isEnded # only end once
+
         @_isEnded = true
         @_prev?._removeNext this
 
@@ -391,38 +393,57 @@ allResolver = (fx, fe, v, isError, cb) ->
         done = 0
         _this = this
         stop = false
-        arr.every (k, idx) -> a = val(k); unwrap a, false, (ua, isError) ->
-            return if stop
-            if isError
-                stop = true
-                cb ua, true  # break on first error
-                return false # stop every
-            return if ua == NVA
-            done++ if r k, idx, ua
-            if arr.length == done
-                stop = true
-                return thenResolver.call _this, fx, fe, result, false, cb
+        arr.every (k, idx) ->
+            a = val(k)
+            unsub = unwrap a, false, (ua, isError) ->
+                return if stop
+                if isError
+                    stop = true
+                    cb ua, true  # break on first error
+                    return
+                return if ua == NVA
+                done++ if r k, idx, ua
+                if arr.length == done
+                    stop = true
+                    unsub?()
+                    return thenResolver.call _this, fx, fe, result, false, cb
+                null
             return true
         return true
     return thenResolver.call this, fx, fe, v, isError, cb
 X::all = stepWith 'all', allResolver
 X.all = (v) -> X(v).all()
 
+# events stream to promise for first value
+onceResolver = (fx, fe, v, isError, cb) ->
+    _this = this
+    # eat up
+    return true if @_once
+    @_once = true
+    endCb = (v, isError, ended) ->
+        cb v, isError, true
+        _this._doEnd()
+    return thenResolver.call this, fx, fe, v, isError, endCb
+X::once = stepWith 'once', onceResolver
+
 # methods with serial version where arguments are _exec one by one.
 SERIAL = ['then', 'fail', 'always', 'spread', 'forEach']
 
 # Recursively unwrap the given value. Callback when we got to the
 # bottom of it.
-unwrap = (v, isError, cb, ended = true) ->
+unwrap = (v, isError, cb, ended = true, prevUnsub) ->
+    unsub = null
     if v instanceof X
-        v._always immediate:true, (v, isError) ->
-            unwrap v, isError, cb, false
+        al = v._always immediate:true, (v, isError) ->
+            unwrap v, isError, cb, false, unsub
             return null # important or we get endless loops
+        unsub = -> prevUnsub?(); al._doEnd()
         v.onEnd -> unwrap NVA, false, cb, ended
     else if isThenable v
         v.then ((x) -> unwrap x, false, cb, ended), ((e) -> unwrap e, true, cb, ended)
     else
         cb v, isError, ended
+    unsub || prevUnsub
 
 # retry the promise producing function f at most max times.
 X.retry = (max, delay, f) ->
