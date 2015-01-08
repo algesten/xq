@@ -93,6 +93,7 @@ module.exports = class X
             reject:    _this._reject
             end:       _this._end
             promise:   _this
+            toString: -> '[object Defer]'
         }
 
     # deliberately bound methods
@@ -232,7 +233,7 @@ module.exports = class X
         @_endOnError = true
         this
 
-    toString: -> @inspect()
+    toString: -> '[object Promise]'
 
 # to call a method and ignore errors
 safeCall = (f) ->
@@ -242,8 +243,10 @@ safeCall = (f) ->
     catch err
         return err
 
-# test if the given object is .thenable
+# test if the given object is .then-able
 isThenable = (o) -> typeof o?.then == 'function'
+# test if object is X or thenable
+isDeferred = (o) -> o instanceof X or isThenable(o)
 
 # mode for finally/fin/always
 ALWAYS = {always:0}
@@ -363,6 +366,39 @@ filterResolver = (fx, fe, v, isError, cb) ->
                 cb NVA, false, ended
     return thenResolver.call this, fx, fe, v, isError, filterCb
 X::filter = stepWith 'filter', filterResolver
+
+# resolver for handling deferreds in [] and {}
+allResolver = (fx, fe, v, isError, cb) ->
+    if Array.isArray v
+        # an array
+        arr = v
+        val = (k) -> k
+        result = []
+        r = (k, idx, val) -> result[idx] = val
+    else if typeof v == 'object' and not isDeferred(v)
+        # a plain object
+        arr = Object.keys(v)
+        val = (k) -> v[k]
+        result = {}
+        r = (k, idx, val) -> result[k] = val
+    if arr?.reduce ((prev,cur) -> prev || isDeferred(val(cur))), false
+        done = 0
+        _this = this
+        firstError = false
+        arr.every (k, idx) -> a = val(k); unwrap a, false, (ua, isError) ->
+            return if firstError
+            if isError
+                firstError = true
+                cb ua, true  # break on first error
+                return false # stop every
+            r k, idx, ua unless ua == NVA
+            if arr.length == ++done
+                return thenResolver.call _this, fx, fe, result, false, cb
+            return true
+        return true
+    return thenResolver.call this, fx, fe, v, isError, cb
+X::all = stepWith 'all', allResolver
+
 
 # methods with serial version where arguments are _exec one by one.
 SERIAL = ['then', 'fail', 'always', 'spread', 'forEach']

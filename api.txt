@@ -19,10 +19,9 @@ p.fail/catch(fx)(e)
 p.always/finally/fin(f, isError)(x or e)
 p.spread(fx)
 
-p.all([] or {})
 ## p.val()
 
-p.forEach(fx)(x)
+p.forEach/each(fx)(x)
 
 p.then serial:true, (v) ->
 p.then.serial (v) ->
@@ -35,7 +34,8 @@ p.slidingWindow
 p.delay(n)
 p.throttle(n)
 p.debounce([immed], n)
+X.poll ?
 
+p.all([] or {})
 p.any
-p.every
-p.some
+p.race

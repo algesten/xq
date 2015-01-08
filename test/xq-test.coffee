@@ -984,7 +984,7 @@ describe 'X', ->
             p.onEnd done
             later -> def.resolve [0,1,2]
 
-    describe 'endOnError', ->
+    describe '.endOnError', ->
 
         it 'stops the stream on first error', (done) ->
 
@@ -1006,3 +1006,81 @@ describe 'X', ->
                 v
             .endOnError()
             .onEnd done
+
+    describe '.all', ->
+
+        it 'waits for all deferreds in an array to be resolved/rejected', (done) ->
+
+            def1 = X.defer()
+            def2 = X.defer()
+            X([def1.promise, def2.promise]).all (arr) ->
+                arr.should.eql [41,42]
+                done()
+            .done()
+            later -> def2.resolve 42
+            later -> def1.resolve 41
+
+        it 'passes non-deferreds through', (done) ->
+
+            def1 = X.defer()
+            X([def1.promise, 42]).all (arr) ->
+                arr.should.eql [41,42]
+                done()
+            .done()
+            later -> def1.resolve 41
+
+        it 'passes non-array values through', (done) ->
+
+            X(42).all (arr) ->
+                arr.should.eql 42
+                done()
+            .done()
+
+        it 'inspect object properties and waits for deferreds', (done) ->
+
+            def1 = X.defer()
+            def2 = X.defer()
+            X({a:def1.promise, b:def2.promise}).all (obj) ->
+                obj.should.eql {a:41,b:42}
+                done()
+            .done()
+            later -> def2.resolve 42
+            later -> def1.resolve 41
+
+        it 'passes non-deferreds props in objects through', (done) ->
+
+            def1 = X.defer()
+            X({a:def1.promise, b:42}).all (obj) ->
+                obj.should.eql {a:41,b:42}
+                done()
+            .done()
+            later -> def1.resolve 41
+
+        it 'lets objects with no deferred props straight through', (done) ->
+
+            X(a = {a:41, b:42}).all (obj) ->
+                obj.should.equal a
+                done()
+            .done()
+
+        it 'breaks on first error in arrays', (done) ->
+
+            def1 = X.defer()
+            def2 = X.defer()
+            X([def1.promise, def2.promise]).all().fail (v) ->
+                v.should.eql 42
+                done()
+            .done()
+            later -> def2.reject 42
+            later -> def1.reject 41
+
+        it 'breaks on first error in objects', (done) ->
+
+            def1 = X.defer()
+            def2 = X.defer()
+            X({a:def1.promise, b:def2.promise}).all().fail (v) ->
+                v.should.eql 42
+                done()
+            .done()
+            later -> def2.reject 42
+            later -> def1.reject 41
