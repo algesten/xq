@@ -166,6 +166,51 @@ only one value is executed at a time.
 * **p.forEach.serial(fx)** attaches `fx` to receive values serially (see `p.forEach`).
 * **p.spread.serial(fx)** attaches `fx` to receive values serially (see `p.spread`).
 
+## Everything is parallel
+
+Every operation in XQ is potentially executed in parallel (in a
+process.nextTick). For non-deferred values this is mostly never noticable.
+
+The result of this operation will come out in the order of the array.
+
+```coffeescript
+X([0,1,2]).forEach (v) -> v*2
+```
+
+There is however one situation with `endOnError` where it may
+matter. A somewhat contrived example.
+
+```coffeescript
+X([0,1,2]).forEach (v) ->
+    throw new Error('fail') if v == 1
+.endOnError()
+.then (v) ->
+  #... will see 0 and 2
+```
+
+The user may expect the last `.then` to never receive the 2. However
+since all values are fed into `forEach` in parallel, the error will
+happen too late to stop the 2. To fix this use `forEach.serial`.
+
+### Parallel deferreds
+
+But when using deferreds the order is not guaranteed.
+
+```coffeescript
+url1 = 'http://www.google.com/'
+url2 = 'http://github.com/'
+url3 = 'http://www.reddit.com/'
+X([url1,url2,url3]).forEach(doRequest) # returns a promise for result
+.map (result) ->
+  # ... ?
+```
+
+Depending on how slow the requests were, the `.map` operation will
+receive the result in any order. To fix it, we can use
+`forEach.serial` which ensures that each url fed to doRequest will
+return a fulfilled promise before the result is passed on to
+`.map`. This however means each requests will run serially.
+
 ## Interoperability with other .then-ables
 
 XQ tries to play nice with other promise packages. It can both wrap and receive other promises.
