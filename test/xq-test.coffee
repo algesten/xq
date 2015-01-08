@@ -771,6 +771,42 @@ describe 'X', ->
             later -> f.should.not.have.been.calledOnce
             later -> def.end()
 
+        it 'waits until end of nested deferred', (done) ->
+
+            innerEnd = null
+            c = 0
+            X.binder (sink, end) ->
+                X(Q([0,1,2])).forEach().then(sink).onEnd innerEnd = spy -> end()
+            .then f = spy (v) ->
+                v.should.eql c++
+            .onEnd ->
+                f.should.have.been.calledThrice
+                innerEnd.should.have.been.calledOnce
+                done()
+            .done()
+
+        it 'throws first error encountered in handlers', (done) ->
+
+            lsts = null
+            try
+                lsts = process.listeners 'uncaughtException'
+                process.removeAllListeners 'uncaughtException'
+                process.on 'uncaughtException', (err) ->
+                    err.should.eql 'err1'
+                    done()
+                X.resolver (resolve) ->
+                    later -> resolve()
+                .onEnd ->
+                    throw 'err1'
+                .onEnd ->
+                    throw 'err2'
+            finally
+                later -> process.on 'uncaughtException', lst for lst in lsts
+
+        it 'throws when attaching if onEnd runs straight away', ->
+
+            expect(->X().onEnd -> throw 'fail').to.throw 'fail'
+
     describe '.filter', ->
 
         it 'releases the original value if step function is true', (done) ->

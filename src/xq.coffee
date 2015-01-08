@@ -163,8 +163,10 @@ module.exports = class X
         @_isEnded = true
         @_prev?._removeNext this
         # invoke on end listeners
-        (safeCall f, this for f in @_onEnd) if @_onEnd
+        errs = (safeCall f for f in @_onEnd) if @_onEnd
+        firstErr = errs.reduce(((prev, cur) -> prev || cur), null) if errs
         @_forward FIN, false
+        throw firstErr if firstErr
         return this
 
     # sets the value and propagates to chained promises
@@ -213,15 +215,24 @@ module.exports = class X
 #        console.log 'onEnd', @inspect()
         @_onEnd = [] unless @_onEnd
         @_onEnd.push f
-        safeCall f, this if @_isEnded
+        err = safeCall f if @_isEnded
+        throw err if err
         this
 
+    # stops the stream from executing any more values on first error.
+    endOnError: ->
+        @_endOnError = true
+        this
+
+    toString: -> @inspect()
+
 # to call a method and ignore errors
-safeCall = (f, v) ->
+safeCall = (f) ->
     try
-        f(v)
+        f()
+        undefined
     catch err
-        # bad
+        return err
 
 # test if the given object is .thenable
 isThenable = (o) -> typeof o?.then == 'function'
