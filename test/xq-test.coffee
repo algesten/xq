@@ -635,6 +635,25 @@ describe 'X', ->
                 done() if v == 3
             .done()
 
+        it 'propagates the end', (done) ->
+
+            X([0,1,2]).forEach().map (v) ->
+                v * 2
+            .onEnd done
+
+        it 'waits with end until the end', (done) ->
+
+            c = 0
+            p = X().then ->
+                def = X.defer()
+                later -> def.resolve [0,1,2]
+                def.promise
+            p.forEach f = spy (v) ->
+                v.should.eql c++
+            .onEnd ->
+                f.should.have.been.calledThrice
+                done()
+
         it 'is aliased to each', ->
 
             X::forEach.should.equal X::each
@@ -756,6 +775,11 @@ describe 'X', ->
         it 'is called when stream ends for promises', (done) ->
 
             X().onEnd -> done()
+
+        it 'returns itself', ->
+
+            x = X()
+            x.should.equal x.onEnd(->)
 
         it 'is called for deferred promise', (done) ->
 
