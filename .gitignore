@@ -21,3 +21,4 @@ bower_components
 doc
 
 lib/xq.js
+lib/retry.js

@@ -360,3 +360,8 @@ unwrap = (v, isError, cb, ended = true) ->
         v.then ((x) -> unwrap x, false, cb, ended), ((e) -> unwrap e, true, cb, ended)
     else
         cb v, isError, ended
+
+# retry the promise producing function f at most max times.
+X.retry = (max, delay, f) ->
+    X._retry = new (require './retry') unless X._retry
+    X._retry.try max, delay, f
