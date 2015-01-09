@@ -8,6 +8,22 @@ clean API modelled on promises with the addition of event streams.
 
 Think of a promise chain, but you can push multiple values down it. `.then == .map`
 
+## Get it
+
+### Installing with NPM
+
+```bash`
+npm install -S xq
+...
+X = require 'xq'
+```
+
+### Download Source
+
+```bash
+git clone https://github.com/algesten/xq.git
+```
+
 ## Example
 
 ### XQ as a Promise
@@ -141,8 +157,9 @@ equivalent.
   error.
 * **p.once(fx)** picks the first event/value from a stream/promise and
   turns that into a promise.
-* **p.serial(fx[,fe])** exactly like `.then/map` but ensures only
-  one argument is executed at a time.
+* **p.serial(fx[,fe])** exactly like `then/map` but ensures only one
+  argument is executed at a time. Additional events are buffered up
+  and executed one by one.
 
 ### Arrays and Objects
 
@@ -185,6 +202,8 @@ There is however one situation with `endOnError` where it may
 matter. A somewhat contrived example.
 
 ```coffeescript
+# This doesn't work as expected!!!
+
 X([0,1,2]).forEach (v) ->
     throw new Error('fail') if v == 1
 .endOnError()
@@ -222,23 +241,6 @@ XQ tries to play nice with other promise packages. It can both wrap and receive 
 `X(Q(42)).then (v) -> ...42`
 
 `X().then(-> Q.reject(42)).fail (v) -> ...42`
-
-## Get it
-
-### Download Source
-
-```bash
-git clone https://github.com/algesten/xq.git
-cd ./xq
-```
-
-### Installing with NPM
-
-```bash`
-$ npm install xq
-...
-X = require 'xq'
-```
 
 ## Why a hybrid?
 
