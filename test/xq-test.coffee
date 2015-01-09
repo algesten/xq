@@ -1099,3 +1099,64 @@ describe 'X', ->
             .then (v) ->
                 done()
             .done()
+
+    describe '.merge', ->
+
+        it 'merges the outputs from several promises/streams', (done) ->
+
+            def1 = X.defer()
+            def2 = X.defer()
+            c = 0
+            X.merge(def1.promise, def2.promise).then (v) ->
+                v.should.eql c++
+                done() if v == 5
+            .done()
+            later -> def1.push 0
+            later -> def2.push 1
+            later -> def1.push 2
+            later -> def2.push 3
+            later -> def1.push 4
+            later -> def2.push 5
+
+        it 'ends the merged when all parts are closed', (done) ->
+
+            def1 = X.defer()
+            def2 = X.defer()
+            c = 0
+            X.merge(def1.promise, def2.promise).then (v) ->
+                v.should.eql c++
+            .onEnd done
+            later -> def1.push 0
+            later -> def2.push 1
+            later -> def1.end()
+            later -> def2.push 2
+            later -> def2.end()
+
+        it 'is possible to merge non-deferreds', (done) ->
+
+            c = 0
+            X.merge(0,1,2).then (v) ->
+                v.should.eql c++
+                done() if v == 2
+            .done()
+
+        it 'merges also errors', (done) ->
+
+            def1 = X.defer()
+            def2 = X.defer()
+            c1 = 0
+            c2 = 0
+            X.merge(def1.promise, def2.promise).then (v) ->
+                v.should.eql c1++
+                null
+            .fail (v) ->
+                v.should.eql c2++
+                null
+            .onEnd done
+            later -> def1.push 0
+            later -> def2.pushError 0
+            later -> def1.pushError 1
+            later -> def2.push 1
+            later -> def1.pushError 2
+            later -> def2.push 2
+            later -> def1.end(); def2.end()

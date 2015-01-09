@@ -137,6 +137,12 @@ equivalent.
 * **def.pushError(e)** to push an error down the chain.
 * **p = def.promise** to get the promise from the deferred.
 
+### Multiple
+
+* **X.merge(s1, s2, ...)** merges the variable number of
+  promises/streams to one. The resulting stream will end when all
+  parts have ended.
+
 ### State
 
 * **p.isEnded()** tells whether the stream has been ended.

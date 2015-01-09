@@ -428,6 +428,18 @@ X::once = stepWith 'once', onceResolver
 # a serial resolver is like a then but one argument at a time.
 X::serial = stepWith 'serial', thenResolver, true, false, true
 
+# a merge of streams
+X.merge = (args...) -> X.binder (sink, end) ->
+    ended = 0
+    all = []
+    for a in args
+        all.push(X(a).always (v, isError) ->
+            sink v, isError
+            null
+        .onEnd ->
+            end() if ++ended == args.length)
+    -> p._doEnd() for p in all
+
 # Recursively unwrap the given value. Callback when we got to the
 # bottom of it.
 unwrap = (v, isError, cb, ended = true, prevUnsub = (->)) ->
