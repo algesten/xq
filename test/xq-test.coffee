@@ -668,7 +668,7 @@ describe 'X', ->
             X::forEach.should.equal X::each
 
 
-    describe '.[step].serial', ->
+    describe.skip '.[step].serial', ->
 
         it 'has a serial version of .forEach', (done) ->
 
@@ -998,7 +998,7 @@ describe 'X', ->
             x = X()
             x.should.equal x.endOnError()
 
-        it 'stops queued up events', (done) ->
+        it.skip 'stops queued up events', (done) ->
 
             X([0,1,2]).forEach.serial().then (v) ->
                 v.should.not.eql 2
@@ -1151,3 +1151,27 @@ describe 'X', ->
                 v.should.eql 42
                 done()
             .done()
+
+    describe 'special', ->
+
+        it 'is special', (done) ->
+
+            X().then ->
+                then: (ores) ->
+                    ores X then: (ires) ->
+                        ires(42)
+                        throw 'bad'
+            .then (v) ->
+                done()
+            .done()
+
+mocha = require 'mocha'
+
+adapter = {
+    resolved: X
+    rejected: X.rejrect
+    deferred: -> X.defer()
+}
+
+describe 'Promises/A+ Tests', ->
+    require('promises-aplus-tests').mocha adapter

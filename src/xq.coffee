@@ -40,21 +40,12 @@ module.exports = class X
 
         @_cnt = cnt++
 
-        if v instanceof X
-            # We chain ourselves to the given promise.
-            # I.e. X(X(42)) is the same value as X(42).
-            v._addNext this
-        else if isThenable v
+        if v == INI
             @_value = INI
-            _this = this
-            v.then ((x) -> _this._resolve(x)), ((e) -> _this._reject(e))
         else
-            # Given a real value, we are already resolved.
-            @_value   = v
-            @_isError = a if typeof (a = arguments[1]) == 'boolean'
-            @_isEnded = v != INI
-
-        @_makeSerial()
+            isError = a if typeof (a = arguments[1]) == 'boolean'
+            if isError then @_reject(v) else @_resolve(v)
+        this
 
     @reject: (reason) -> new X(reason, true)
 
@@ -215,12 +206,6 @@ module.exports = class X
         @_next.splice i, 1 if i = @_next.indexOf(n) >= 0
         this
 
-    # synthesize .serial versions
-    _makeSerial: ->
-        SERIAL.forEach (f) =>
-            @[f].serial = (fx, fe) => @[f].call this, serial:true, fx, fe
-        this
-
     # adds an on end listener.
     onEnd: (f) ->
 #        console.log 'onEnd', @inspect()
@@ -245,8 +230,18 @@ safeCall = (f) ->
     catch err
         return err
 
-# test if the given object is .then-able
-isThenable = (o) -> typeof o?.then == 'function'
+# test if the given object is .then-able, and make damn sure
+# we only check .then once.
+isThenable = (o, onErr) ->
+    try
+        return false unless o?
+        return false unless typeof o in ['object', 'function']
+        t = o.then
+        if typeof t == 'function' then t else false
+    catch err
+        onErr err
+        # then accessor threw error, but that means it existed.
+        return true
 # test if object is X or thenable
 isDeferred = (o) -> o instanceof X or isThenable(o)
 
@@ -277,20 +272,16 @@ makeResolver = (mode) -> (fx, fe, v, isError, cb) ->
 # Makes a new promise chained off this with given resolver.
 unitFx = (x) -> x
 unitFe = (e) -> throw e
-stepWith = (type, resolver, twoF, finish) -> (opts, fx, fe) ->
-    unless typeof opts == 'object'
-        fe = fx
-        fx = opts
-        opts = null
-    fx = unitFx unless fx
-    fe = unitFe unless !twoF or fe
+stepWith = (type, resolver, twoF, finish, serial, immediate) -> (fx, fe) ->
+    fx = unitFx unless typeof fx == 'function'
+    fe = unitFe unless typeof fe == 'function'
     p = new X(INI)
     p._type = type
     p._resolver = resolver
     p._fx = fx
     p._fe = fe if twoF
-    p._serial = !!opts?.serial
-    p._immediate = !!opts?.immediate
+    p._serial = !!serial
+    p._immediate = !!immediate
     @_addNext p
     return if finish then undefined else p
 
@@ -302,7 +293,7 @@ X::then    = X::map   = stepWith 'then', thenResolver, true
 X::fail    = X::catch = stepWith 'fail', failResolver
 X::always  = X::fin = X::finally = stepWith 'always', alwaysResolver
 # internal always-resolver to not confuse things
-X::_always = stepWith '[always]', alwaysResolver
+X::_always = stepWith 'always', alwaysResolver, true, false, false, true
 
 # spread is like then
 X::spread = stepWith 'spread', (fx, fe, v, isError, cb) ->
@@ -376,18 +367,22 @@ allResolver = (fx, fe, v, isError, cb) ->
         arr = v
         val = (k) -> k
         result =  Array.apply(null, Array(v.length)).map -> NVA
-        r = (k, idx, val) ->
+        unsubs = []
+        r = (k, idx, val, unsub) ->
             return false unless result[idx] == NVA
             result[idx] = val
+            unsubs.push unsub
             true
     else if typeof v == 'object' and not isDeferred(v)
         # a plain object
         arr = Object.keys(v)
         val = (k) -> v[k]
         result = {}
-        r = (k, idx, val) ->
+        unsubs = []
+        r = (k, idx, val, unsub) ->
             return false if result.hasOwnProperty(k)
             result[k] = val
+            unsubs.push unsub
             true
     if arr?.reduce ((prev,cur) -> prev || isDeferred(val(cur))), false
         done = 0
@@ -395,16 +390,18 @@ allResolver = (fx, fe, v, isError, cb) ->
         stop = false
         arr.every (k, idx) ->
             a = val(k)
-            unwrap a, false, (ua, isError) ->
+            unwrap a, false, (ua, isError, ended, unsub) ->
                 return if stop
                 if isError
                     stop = true
                     cb ua, true  # break on first error
                     return
                 return if ua == NVA
-                done++ if r k, idx, ua
+                done++ if r k, idx, ua, unsub
                 if arr.length == done
                     stop = true
+                    # unsubscribe all wrapped
+                    u() for u in unsubs
                     return thenResolver.call _this, fx, fe, result, false, cb
                 null
             return true
@@ -419,9 +416,10 @@ onceResolver = (fx, fe, v, isError, cb) ->
     # eat up
     return true if @_once
     @_once = true
-    endCb = (v, isError, ended) ->
+    endCb = (v, isError, ended, unsub) ->
         cb v, isError, true
         _this._doEnd()
+        unsub()
     return thenResolver.call this, fx, fe, v, isError, endCb
 X::once = stepWith 'once', onceResolver
 
@@ -430,16 +428,28 @@ SERIAL = ['then', 'fail', 'always', 'spread', 'forEach']
 
 # Recursively unwrap the given value. Callback when we got to the
 # bottom of it.
-unwrap = (v, isError, cb, ended = true) ->
+unwrap = (v, isError, cb, ended = true, prevUnsub = (->)) ->
+    unsub = prevUnsub
     if v instanceof X
-        al = v._always immediate:true, (v, isError) ->
-            unwrap v, isError, cb, false
+        al = v._always (v, isError) ->
+            unsub = -> prevUnsub(); al._doEnd()
+            unwrap v, isError, cb, false, unsub
             return null # important or we get endless loops
-        v.onEnd -> unwrap NVA, false, cb, ended
-    else if isThenable v
-        v.then ((x) -> unwrap x, false, cb, ended), ((e) -> unwrap e, true, cb, ended)
+        v.onEnd -> unwrap NVA, false, cb, ended, unsub
+    else if t = isThenable v, ((err) -> unwrap err, true, cb, ended, unsub)
+        return if t == true # err handler ran
+        got = false
+        try
+            f = (isError) ->
+                (x) ->
+                    return if got; got = true; unwrap x, isError, cb, ended, unsub
+            t.call v, f(false), f(true)
+        catch err
+            return if got
+            got = true
+            unwrap err, true, cb, ended, unsub
     else
-        cb v, isError, ended
+        cb v, isError, ended, unsub
 
 # retry the promise producing function f at most max times.
 X.retry = (max, delay, f) ->
