@@ -6,7 +6,11 @@ XQ - Reactive Promises
 XQ is a hybrid between promises and reactive extensions. A simple
 clean API modelled on promises with the addition of event streams.
 
-Think of a promise chain, but you can push multiple values down it. `.then == .map`
+XQ is in its core a Promises/A+ compliant promises implementation, but
+it is also a stream.
+
+Think of it as a promise chain that you can push multiple values
+down. `.then == .map`
 
 ## Get it
 
