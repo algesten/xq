@@ -109,7 +109,7 @@ module.exports = class X
         @_execCount++
         unless @_resolver @_fx, @_fe, v, isError, @_resolverExit
             # resolver did not handle the value => set incoming
-            @_resolverExit v, isError
+            @_resolverExit v, isError, true
         this
 
     # enqueue event in linked list
@@ -221,6 +221,8 @@ module.exports = class X
         this
 
     toString: -> '[object Promise]'
+
+X.toString = -> '[object X]'
 
 # to call a method and ignore errors
 safeCall = (f) ->

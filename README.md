@@ -1,5 +1,5 @@
-XQ - Reactive Promises (experimental)
-=====================================
+XQ - Reactive Promises
+======================
 
 [![Build Status](https://travis-ci.org/algesten/xq.svg)](https://travis-ci.org/algesten/xq)
 

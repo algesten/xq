@@ -728,6 +728,22 @@ describe 'X', ->
 
             expect(->X().onEnd -> throw 'fail').to.throw 'fail'
 
+        it 'can be chained after then and fail', (done) ->
+
+            c1 = 0
+            c2 = 0
+            def = X.defer()
+            def.promise.then (v) ->
+                v.should.eql c1++
+            .fail (v) ->
+                v.should.eql c2++
+            .onEnd done
+            later -> def.push 0
+            later -> def.pushError 0
+            later -> def.push 1
+            later -> def.pushError 1
+            later -> def.end()
+
     describe '.filter', ->
 
         it 'releases the original value if step function is true', (done) ->
