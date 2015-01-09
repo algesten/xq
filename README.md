@@ -3,11 +3,9 @@ XQ - Reactive Promises
 
 [![Build Status](https://travis-ci.org/algesten/xq.svg)](https://travis-ci.org/algesten/xq)
 
-XQ is a hybrid between promises and reactive extensions. A simple
-clean API modelled on promises with the addition of event streams.
-
-XQ is in its core a Promises/A+ compliant promises implementation, but
-it is also a stream.
+XQ is a hybrid between promises and reactive extensions. Its core is a
+[Promises/A+](https://promisesaplus.com/) compliant promises
+implementation that can also function as a stream.
 
 Think of it as a promise chain that you can push multiple values
 down. `.then == .map`
