@@ -423,8 +423,8 @@ onceResolver = (fx, fe, v, isError, cb) ->
     return thenResolver.call this, fx, fe, v, isError, endCb
 X::once = stepWith 'once', onceResolver
 
-# methods with serial version where arguments are _exec one by one.
-SERIAL = ['then', 'fail', 'always', 'spread', 'forEach']
+# a serial resolver is like a then but one argument at a time.
+X::serial = stepWith 'serial', thenResolver, true, false, true
 
 # Recursively unwrap the given value. Callback when we got to the
 # bottom of it.

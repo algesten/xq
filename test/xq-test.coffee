@@ -667,118 +667,6 @@ describe 'X', ->
 
             X::forEach.should.equal X::each
 
-
-    describe.skip '.[step].serial', ->
-
-        it 'has a serial version of .forEach', (done) ->
-
-            def = X.defer()
-            c = 0
-            X([0,def.promise,2]).forEach.serial().then (v) ->
-                v.should.eql c++
-                done() if v == 2
-            .done()
-            later -> def.resolve(1)
-            null
-
-        it 'has a serial version of .then', (done) ->
-
-            def = null
-            c = 0
-            X([0,1,2]).forEach().then.serial f = spy (v) ->
-                if v == 1
-                    (def = X.defer()).promise
-                else
-                    v
-            .then (v) ->
-                v.should.eql c++
-                if v == 0
-                    f.should.have.been.calledOnce
-                if v == 1
-                    f.should.have.been.calledTwice
-                if v == 3
-                    f.should.have.been.calledThrice
-                done() if v == 2
-            .done()
-            later -> def.resolve(1)
-            null
-
-        it 'has a serial version of .fail', (done) ->
-
-            def = null
-            c = 0
-            X([0,1,2]).forEach (v) ->
-                throw v
-            .fail.serial f = spy (v) ->
-                if v == 1
-                    (def = X.defer()).promise
-                else
-                    v
-            .then (v) ->
-                v.should.eql c++
-                if v == 0
-                    f.should.have.been.calledOnce
-                if v == 1
-                    f.should.have.been.calledTwice
-                if v == 3
-                    f.should.have.been.calledThrice
-                done() if v == 2
-            .done()
-            later -> def.resolve(1)
-            null
-
-        it 'has a serial version of .always', (done) ->
-
-            def = null
-            c = 0
-            X([0,1,2]).forEach (v) ->
-                if v == 1
-                    throw v
-                else
-                    v
-            .always.serial f = spy (v) ->
-                if v == 1
-                    (def = X.defer()).promise
-                else
-                    v
-            .then (v) ->
-                v.should.eql c++
-                if v == 0
-                    f.should.have.been.calledOnce
-                if v == 1
-                    f.should.have.been.calledTwice
-                if v == 3
-                    f.should.have.been.calledThrice
-                done() if v == 2
-            .done()
-            later -> def.resolve(1)
-            null
-
-        it 'has a serial version of .spread', (done) ->
-
-            def = null
-            c = 0
-            X([0,1,2]).forEach (v) ->
-                [v,v]
-            .spread.serial f = spy (v1, v2) ->
-                v1.should.eql v2
-                if v1 == 1
-                    (def = X.defer()).promise
-                else
-                    v1
-            .then (v) ->
-                v.should.eql c++
-                if v == 0
-                    f.should.have.been.calledOnce
-                if v == 1
-                    f.should.have.been.calledTwice
-                if v == 3
-                    f.should.have.been.calledThrice
-                done() if v == 2
-            .done()
-            later -> def.resolve(1)
-            null
-
     describe '.onEnd', ->
 
         it 'is called when stream ends for promises', (done) ->
@@ -998,9 +886,9 @@ describe 'X', ->
             x = X()
             x.should.equal x.endOnError()
 
-        it.skip 'stops queued up events', (done) ->
+        it 'stops queued up events', (done) ->
 
-            X([0,1,2]).forEach.serial().then (v) ->
+            X([0,1,2]).forEach().serial().then (v) ->
                 v.should.not.eql 2
                 throw 'fail' if v == 1
                 v
@@ -1152,7 +1040,38 @@ describe 'X', ->
                 done()
             .done()
 
-    describe 'special', ->
+    describe '.serial', ->
+
+        it 'ensures only one argument is executed at a time', ->
+
+            c = 0
+            X([0,1,2]).forEach().serial (v) ->
+                c++
+                def = X.defer()
+                later ->
+                    def.resolve(v)
+                def.promise
+            .then (v) ->
+                c.should.eql 1
+                c--
+            .done()
+
+        it 'ensures only one argument is fails at a time', ->
+
+            c = 0
+            X([0,1,2]).forEach((v) -> throw v).serial null, (v) ->
+                c++
+                def = X.defer()
+                later ->
+                    def.resolve(v)
+                def.promise
+            .then (v) ->
+                c.should.eql 1
+                c--
+            .done()
+
+
+    describe 'special promise a+ investigation', ->
 
         it 'is special', (done) ->
 
