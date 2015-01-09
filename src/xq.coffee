@@ -395,7 +395,7 @@ allResolver = (fx, fe, v, isError, cb) ->
         stop = false
         arr.every (k, idx) ->
             a = val(k)
-            unsub = unwrap a, false, (ua, isError) ->
+            unwrap a, false, (ua, isError) ->
                 return if stop
                 if isError
                     stop = true
@@ -405,7 +405,6 @@ allResolver = (fx, fe, v, isError, cb) ->
                 done++ if r k, idx, ua
                 if arr.length == done
                     stop = true
-                    unsub?()
                     return thenResolver.call _this, fx, fe, result, false, cb
                 null
             return true
@@ -431,19 +430,16 @@ SERIAL = ['then', 'fail', 'always', 'spread', 'forEach']
 
 # Recursively unwrap the given value. Callback when we got to the
 # bottom of it.
-unwrap = (v, isError, cb, ended = true, prevUnsub) ->
-    unsub = null
+unwrap = (v, isError, cb, ended = true) ->
     if v instanceof X
         al = v._always immediate:true, (v, isError) ->
-            unwrap v, isError, cb, false, unsub
+            unwrap v, isError, cb, false
             return null # important or we get endless loops
-        unsub = -> prevUnsub?(); al._doEnd()
         v.onEnd -> unwrap NVA, false, cb, ended
     else if isThenable v
         v.then ((x) -> unwrap x, false, cb, ended), ((e) -> unwrap e, true, cb, ended)
     else
         cb v, isError, ended
-    unsub || prevUnsub
 
 # retry the promise producing function f at most max times.
 X.retry = (max, delay, f) ->
