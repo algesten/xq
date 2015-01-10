@@ -1,9 +1,9 @@
 XQ - Reactive Promises
 ======================
 
-[![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/algesten/xq?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+[![Build Status](https://travis-ci.org/algesten/xq.svg)](https://travis-ci.org/algesten/xq) [![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/algesten/xq)
 
-[![Build Status](https://travis-ci.org/algesten/xq.svg)](https://travis-ci.org/algesten/xq)
+
 
 XQ is a hybrid between promises and reactive extensions. Its core is a
 [Promises/A+](https://promisesaplus.com/) compliant promises
