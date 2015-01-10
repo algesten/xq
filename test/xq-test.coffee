@@ -1063,6 +1063,61 @@ describe 'X', ->
             later -> def1.push 55
             later -> def2.push 42
 
+    describe '.snapshot', ->
+
+        it 'takes current event value in streams', (done) ->
+
+            def1 = X.defer()
+            def2 = X.defer(42)
+            X([def1.promise, def2.promise]).snapshot().spread (a0, a1) ->
+                a0.should.eql 41
+                a1.should.eql 42
+                done()
+            .done()
+            later -> def1.push 41
+            later -> def1.push 55
+
+        it 'is exposed as X.snapshot()', (done) ->
+
+            def1 = X.defer()
+            def2 = X.defer(42)
+            X.snapshot([def1.promise, def2.promise]).spread (a0, a1) ->
+                a0.should.eql 41
+                a1.should.eql 42
+                done()
+            .done()
+            later -> def1.push 41
+            later -> def1.push 55
+
+
+        it 'updates to latest event also for already resolved value', (done) ->
+
+            def1 = X.defer()
+            def2 = X.defer()
+            X.snapshot([def1.promise, def2.promise, 44]).spread (a0, a1, a2) ->
+                a0.should.eql 55
+                a1.should.eql 42
+                a2.should.eql 44
+                done()
+            .done()
+            later -> def1.push 41
+            later -> def1.push 55
+            later -> def2.push 42
+
+        it 'also works for objects', (done) ->
+
+            def1 = X.defer()
+            def2 = X.defer()
+            X.snapshot({a:def1.promise, b:def2.promise, c:44}).then ({a, b, c}) ->
+                a.should.eql 41
+                b.should.eql 55
+                c.should.eql 44
+                done()
+            .done()
+            later -> def2.push 42
+            later -> def2.push 55
+            later -> def1.push 41; def1.push 42
+
     describe '.once', ->
 
         it 'creates a promise that takes the first value of a stream/promise', (done) ->

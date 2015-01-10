@@ -167,7 +167,8 @@ equivalent.
   stream/promise.
 * **p.serial(fx[,fe])** exactly like `then/map` but ensures only one
   argument is executed at a time. Additional events are buffered up
-  and executed one by one.
+  and executed one by one. See section on
+  [everything being parallel](#everything-is-parallel).
 
 ### Arrays and Objects
 
@@ -176,7 +177,9 @@ equivalent.
   invoke `fx(a0)`, `fx(a1)`, `fx(a2)`
 * **p.singly/oneByOne(fx)** serialized version of `forEach`. Each
   value in the array is fed to the function only when the last value
-  is finished. This mainly makes a difference for deferreds.
+  is finished. This mainly makes a difference for deferreds. See
+  section explaining
+  [forEach and singly](#foreach-has-a-serial-pitfall).
 * **p.spread(fx)** attaches `fx` to receive values. If the value is an
   array, the array will be destructured to arguments in
   `fx`. I.e. `[a0,a1,a2]` will invoke `fx(a0, a1, a2)`. Non-array
@@ -184,14 +187,18 @@ equivalent.
 * **p.all(fx)** attaches `fx` to receive resolved arrays/objects. If
   the value to be executed is an array of promises `[p1,p2,...]`, `fx`
   will only be invoked when all promises are resolved and will be
-  receving an array with the resolved values. For objects the function
-  inspects each top level property (no deep inspection).
+  receving an array with the *first* resolved values. For objects the
+  function inspects each top level property (no deep inspection).
   `{a:p1,b:p2,...}` will result in an object with the resolved values
   bound to the same keys. Any promise failing will abort and reject
   with the error of that promise. For streams it ensures there is *a*
-  pushed value, it keeps the first one received regardless of there
+  pushed value, it keeps the *first one* received regardless of there
   being more.
 * **X.all(v)** same as `X(v).all()`.
+* **p.snapshot(fx)** like `.all`, but uses *current value* instead of
+  first. See section about the difference between
+  [all or snapshot](#all-or-snapshot).
+* **X.snapshot** same as `X(v).snapshot()`.
 
 ### Filtering
 
@@ -239,7 +246,7 @@ X([url1,url2,url3]).forEach(doRequest) # returns a promise for result
 .map (result) ->
   # ... ?
   ```
-  
+
 Depending on how slow the requests were, the `.map` operation will
 receive the result in any order. To fix it, we can use
 `forEach().serial()` which ensures that each url fed to doRequest will
@@ -313,6 +320,39 @@ It will queue up each value of the array to be executed one after
 another. That means `.singly (v) -> X(doSomething(v))` would wait with
 feeding another value to the function until the previous has been
 unwrapped. The same goes for the non-argument `.singly()`.
+
+## .all or .snapshot
+
+`.all` takes the first value `.snapshot` takes the current. This can
+be illustrated in beautiful yet informative ascii art.
+
+```
+                                          .all
+  stream1       a3 - a2 - a1 ->           [  ]
+  stream2  b3 - b2 - b1 ->                [  ]
+  stream3                       c3 - c2 - [c1] ->
+
+```
+
+At this point `.all` has not resolved, only c1 in stream 3 has
+been. For the three streams moving into the `.all` array, only the
+first value will be used. Hence when the promise for `.all` resolves,
+we will get an array with the values `[a1,b1,c1]`, the *first* three
+values of the three streams.
+
+For snapshot however:
+
+```
+                    .snapshot
+  stream1       a3 - [a2] - a1 ->
+  stream2  b3 - b2 - [b1] ->
+  stream3            [c3]         c3 - c2 - c1 ->
+
+```
+
+At the point when all incoming streams have a value (stream 2 being
+the last), both stream 1 and stream 3 have taken other values. Hence
+the snapshot when it resolves is the `current` state `[a2,b1,c3]`.
 
 ## Interoperability with other .then-ables
 

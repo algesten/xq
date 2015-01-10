@@ -355,7 +355,7 @@ filterResolver = (fx, fe, v, isError, cb) ->
 X::filter = stepWith 'filter', filterResolver
 
 # resolver for handling deferreds in [] and {}
-allResolver = (fx, fe, v, isError, cb) ->
+allResolver = (snapshot) -> (fx, fe, v, isError, cb) ->
     if Array.isArray v
         # an array
         arr = v
@@ -363,10 +363,11 @@ allResolver = (fx, fe, v, isError, cb) ->
         result =  Array.apply(null, Array(v.length)).map -> NVA
         unsubs = []
         r = (k, idx, val, unsub) ->
-            return false unless result[idx] == NVA
+            isNew = result[idx] == NVA
+            return false unless snapshot or isNew
             result[idx] = val
             unsubs.push unsub
-            true
+            isNew
     else if typeof v == 'object' and not isDeferred(v)
         # a plain object
         arr = Object.keys(v)
@@ -374,10 +375,11 @@ allResolver = (fx, fe, v, isError, cb) ->
         result = {}
         unsubs = []
         r = (k, idx, val, unsub) ->
-            return false if result.hasOwnProperty(k)
+            isNew = !result.hasOwnProperty(k)
+            return false unless snapshot or isNew
             result[k] = val
             unsubs.push unsub
-            true
+            isNew
     if arr?.reduce ((prev,cur) -> prev || isDeferred(val(cur))), false
         done = 0
         _this = this
@@ -401,8 +403,10 @@ allResolver = (fx, fe, v, isError, cb) ->
             return true
         return true
     return thenResolver.call this, fx, fe, v, isError, cb
-X::all = stepWith 'all', allResolver
+X::all = stepWith 'all', allResolver(false)
 X.all = (v) -> X(v).all()
+X::snapshot = stepWith 'snapshot', allResolver(true)
+X.snapshot = (v) -> X(v).snapshot()
 
 # events stream to promise for first value
 onceResolver = (fx, fe, v, isError, cb) ->
