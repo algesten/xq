@@ -163,8 +163,8 @@ equivalent.
   errors. The signature for `f` is `(v, isError) ->` where the second
   argument is a boolean telling whether the received value was an
   error.
-* **p.once(fx)** picks the first event/value from a stream/promise and
-  turns that into a promise.
+* **p.once(fx)** returns a promise for the first event/value from a
+  stream/promise.
 * **p.serial(fx[,fe])** exactly like `then/map` but ensures only one
   argument is executed at a time. Additional events are buffered up
   and executed one by one.
@@ -174,6 +174,9 @@ equivalent.
 * **p.forEach/each(fx)** attached `fx` to receive values. If the value is
   an array, it will invoke `fx` one by one. I.e. `[a0,a1,a2]` will
   invoke `fx(a0)`, `fx(a1)`, `fx(a2)`
+* **p.singly/oneByOne(fx)** serialized version of `forEach`. Each
+  value in the array is fed to the function only when the last value
+  is finished. This mainly makes a difference for deferreds.
 * **p.spread(fx)** attaches `fx` to receive values. If the value is an
   array, the array will be destructured to arguments in
   `fx`. I.e. `[a0,a1,a2]` will invoke `fx(a0, a1, a2)`. Non-array
@@ -198,7 +201,8 @@ equivalent.
 ## Everything is parallel
 
 Every operation in XQ is potentially executed in parallel (in a
-process.nextTick). For non-deferred values this is mostly never noticable.
+process.nextTick). For non-deferred values this is mostly never
+noticable.
 
 The result of this operation will come out in the order of the array.
 
@@ -234,17 +238,86 @@ url3 = 'http://www.reddit.com/'
 X([url1,url2,url3]).forEach(doRequest) # returns a promise for result
 .map (result) ->
   # ... ?
-```
-
+  ```
+  
 Depending on how slow the requests were, the `.map` operation will
 receive the result in any order. To fix it, we can use
 `forEach().serial()` which ensures that each url fed to doRequest will
 return a fulfilled promise before the result is passed on to
 `.map`. This however means each requests will run serially.
 
+### Strategy for unwrapping deferreds
+
+The principle for unwrapping deferreds is to *unwrap on exit* of each
+step.
+
+```coffeescript
+X(X(42)).then((v) -> X(v)).then (v) -> #... look ma, v is still 42!
+```
+
+If we break down this sequence.
+
+1. Each `X()` is a step like all others. It can be thought of as
+   `.then (x) -> x` (a bit more involved since it handles errors).
+2. `X()` wraps a deferred `X(42)`.
+3. On the exit of the outmost `X()`, the inner `X(42)` is unwrapped to
+   `42`.
+4. `42` is therefor fed into the next `.then`-step and invoked for the
+   function `(v) -> X(v)`.
+5. That function once again wraps `v` (42) into a `X(v)` which on the
+   exit of that same `.then`-step is unwrapped again back to `42`
+6. The last `.then`-step is therefore also just fed `42`.
+
+### forEach has a serial pitfall
+
+When using `forEach` in combination with arrays of promises, there is
+a potential pitfall. `forEach` is also parallel and does not wait for
+one deferred to finish before feeding the next, which means the
+following code would execute `doSomething` in parallell for the values
+of the array.
+
+```coffeescript
+# forEach does not work serially!
+p1 = makePromise()
+p2 = makePromise()
+p3 = makePromise()
+
+X([p1,p2,p3]).forEach (p) -> p.then(doSomething)...
+```
+
+#### .forEach().serial() is not serial
+
+A mistaken attempt at fixing this would be to use `serial`, as in
+`.forEach().serial (p) ->...` but this does not work. Having no
+function to `forEach` would be the equivalent to `(x) -> x` and any
+deferred would be unwrapped on the exit of that `forEach`-step. This
+means all deferred have been unwrapped in parallel already before the
+invocation of `.serial()`.
+
+#### .singly() does things serially.
+
+`.singly()` (or alias `.oneByOne()`)is a serialized version of
+`.forEach()`.
+
+```coffeescript
+# singly is serial
+p1 = makePromise()
+p2 = makePromise()
+p3 = makePromise()
+
+X([p1,p2,p3]).singly (p) -> p.then(doSomething)... # is done one by one
+
+```
+
+It will queue up each value of the array to be executed one after
+another. That means `.singly (v) -> X(doSomething(v))` would wait with
+feeding another value to the function until the previous has been
+unwrapped. The same goes for the non-argument `.singly()`.
+
 ## Interoperability with other .then-ables
 
-XQ tries to play nice with other promise packages. It can both wrap and receive other promises.
+XQ tries to play nice with other promise packages. It can both wrap
+and receive other promises.
 
 `X(Q(42)).then (v) -> ...42`
 

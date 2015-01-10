@@ -47,12 +47,15 @@ describe 'X', ->
             def = X.defer()
             px = X(def.promise)
             c = 42
+            px.isEnded().should.be.false
             px.then (v) ->
                 v.should.eql c++
-                done() if v == 43
-            .done()
+            .onEnd ->
+                px.isEnded().should.be.true
+                done()
             later -> def.push 42
             later -> def.push 43
+            later -> def.end()
 
     describe 'error instantiation', ->
 
@@ -666,6 +669,40 @@ describe 'X', ->
         it 'is aliased to each', ->
 
             X::forEach.should.equal X::each
+
+    describe '.singly', ->
+
+        it 'turns any incoming array into a series of events, serially', (done) ->
+
+            c = 0
+            X([0,1,2,3,4,5]).singly (v) ->
+                c++
+                c.should.eql 1
+                def = X.defer()
+                later -> def.resolve v
+                def.promise
+            .then ->
+                c--
+            .onEnd done
+            .done()
+
+        it 'turns any incoming array which fails serially', (done) ->
+
+            c = 0
+            X([0,1,2,3,4,5]).singly (v) ->
+                c++
+                c.should.eql 1
+                def = X.defer()
+                later -> def.resolve v
+                throw def.promise
+            .fail ->
+                c--
+            .onEnd done
+            .done()
+
+        it 'is aliased to oneByOne', ->
+
+            X::oneByOne.should.equal X::singly
 
     describe '.onEnd', ->
 

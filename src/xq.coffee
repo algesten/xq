@@ -315,35 +315,27 @@ X::done = stepWith 'done', doneResolver, true, true
 
 # forEach emits array elements one by one
 forEachResolver = (fx, fe, v, isError, cb) ->
-    if !isError and Array.isArray v
-        # zero length array means we emit no value down the chain.
-        if v.length == 0
-            cb NVA, false, true
-            return true
-        arr = v.slice(0)
-        _this = this
-        if !_this._serial
-            # increase exec count with the amount of values we intend to
-            # emit -1 for the one already counted up when entering _exec.
-            @_execCount += (arr.length - 1)
-        do takeOne = ->
-            if arr.length == 0
-                # kick off the serial mode pick
-                cb NVA, false, true if _this._serial
-                return
-            x = arr.shift()
-            unwrap x, false, (v, isError) ->
-                return if v == NVA
-                if _this._serial
-                    _this._enqueue v, isError
-                else
-                    unless thenResolver.call _this, fx, fe, v, isError, cb
-                        cb v, isError, false
-                takeOne()
-        return true
-    else
+    if isError or !Array.isArray(v)
         return thenResolver.call this, fx, fe, v, isError, cb
-X::forEach = X::each = stepWith 'forEach', forEachResolver
+    # zero length array means we emit no value down the chain.
+    if v.length == 0
+        cb NVA, false, true
+        return true
+    # increase exec count with the amount of values we intend to emit
+    # -1 for the one already counted up when entering _exec.
+    @_execCount += (v.length - 1) unless @_serial
+    for x in v
+        if @_serial
+            @_enqueue x, isError
+        else
+            unless thenResolver.call this, fx, fe, x, false, cb
+                cb x, false, false
+    # kick of serial execution
+    cb NVA, false, true if @_serial
+    return true
+X::forEach = X::each     = stepWith 'forEach', forEachResolver, false, false, false
+# The serial version
+X::singly  = X::oneByOne = stepWith 'singly',  forEachResolver, false, false, true
 
 # resolver to handle .filter (x) ->. if returned value is truthy,
 # value is released down the chain.
