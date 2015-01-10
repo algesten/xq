@@ -334,7 +334,7 @@ be illustrated in beautiful yet informative ascii art.
 
 ```
 
-At this point `.all` has not resolved, only c1 in stream 3 has
+At this point `.all` has not resolved, only value `c1` in stream3 has
 been. For the three streams moving into the `.all` array, only the
 first value will be used. Hence when the promise for `.all` resolves,
 we will get an array with the values `[a1,b1,c1]`, the *first* three
@@ -350,8 +350,8 @@ For snapshot however:
 
 ```
 
-At the point when all incoming streams have a value (stream 2 being
-the last), both stream 1 and stream 3 have taken other values. Hence
+At the point when all incoming streams have a value (stream2 being
+the last), both stream1 and stream3 have taken other values. Hence
 the snapshot when it resolves is the `current` state `[a2,b1,c3]`.
 
 ## Interoperability with other .then-ables
@@ -395,3 +395,11 @@ probably want `.flatMap`.
 
 In XQ `then` == `map`, there is no difference and a deferred value is
 just a special case of an event stream.
+
+Another weirdness is the idea of lazy streams. It is very important to
+end a rx-style chain with something that "subscribes"
+(i.e. `.onValue()`, `.subscribe()`, `.onError()` etc). It could be
+argued that this makes a more obvious distinction between functions
+and side effects, but I'm still not convinced. I really don't find
+myself ever creating random streams that I end up not using (i.e. not
+subscribing to). The point of laziness seems pedantic and unnecessary.
