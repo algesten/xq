@@ -141,20 +141,17 @@ equivalent.
 * **def.pushError(e)** to push an error down the chain.
 * **p = def.promise** to get the promise from the deferred.
 
-### Multiple
-
-* **X.merge(s1, s2, ...)** merges the variable number of
-  promises/streams to one. The resulting stream will end when all
-  parts have ended.
-
 ### State
 
 * **p.isEnded()** tells whether the stream has been ended.
 * **p.isPending()** tells whether the promise is pending. Equivalent to `!p.isEnded()`.
 * **p.isFulfilled()** tells whether the promise is resolved.
 * **p.isRejected()** tells whether the promise is rejected.
-* **p.onEnd(f)** will call `f` when stream is ended.
-* **p.endOnError()** makes stream stop on first encountered error.
+* **p.onEnd(f)** will call `f` when stream is ended. Returns self.
+* **p.endOnError()** makes stream stop on first encountered
+  error. Returns self.
+* **p.stop()** Immediately stops the stream. After this `isEnded()`
+  will be true. Returns self.
 
 ### Chaining
 
@@ -165,12 +162,12 @@ equivalent.
   errors. The signature for `f` is `(v, isError) ->` where the second
   argument is a boolean telling whether the received value was an
   error.
-* **p.once(fx)** returns a promise for the first event/value from a
-  stream/promise.
 * **p.serial(fx[,fe])** exactly like `then/map` but ensures only one
   argument is executed at a time. Additional events are buffered up
   and executed one by one. See section on
   [everything being parallel](#everything-is-parallel).
+* **p.once(fx)** returns a promise for the first event/value from a
+  stream/promise. Automatcially ends when first value is received.
 
 ### Arrays and Objects
 
@@ -201,6 +198,12 @@ equivalent.
   first. See section about the difference between
   [all or snapshot](#all-or-snapshot).
 * **X.snapshot** same as `X(v).snapshot()`.
+
+### Multiple
+
+* **X.merge(s1, s2, ...)** merges the variable number of
+  promises/streams to one. The resulting stream will end when all
+  parts have ended.
 
 ### Filtering
 

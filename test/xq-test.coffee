@@ -1252,3 +1252,18 @@ describe 'X', ->
             later -> def1.pushError 2
             later -> def2.push 2
             later -> def1.end(); def2.end()
+
+    describe '.stop', ->
+
+        it 'immediately stops the stream', (done) ->
+
+            f = null
+            stream = X.binder (sink) ->
+                t = setInterval (-> sink Date.now()), 1
+                return f = spy -> clearInterval t
+            stream.then f2 = spy (x) -> x
+            stream.onEnd ->
+                f.should.have.been.calledOnce
+                f2.should.have.been.called
+                done()
+            later -> stream.stop()

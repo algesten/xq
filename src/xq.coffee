@@ -220,6 +220,9 @@ module.exports = class X
         @_endOnError = true
         this
 
+    # immediately stops the stream
+    stop: -> @_doEnd()
+
     toString: -> '[object Promise]'
 
 X.toString = -> '[object X]'
