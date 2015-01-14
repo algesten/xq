@@ -313,7 +313,7 @@ X::spread = stepWith 'spread', (fx, fe, v, isError, cb) ->
 # done method is special, because it bubbles any exceptions.
 doneResolver = (fx, fe, v, isError, cb) ->
     if isError and not fe or fe == unitFe
-        fe = -> nextTick -> throw (if v instanceof Error then v else new Error(v))
+        fe = -> setTimeout (-> throw (if v instanceof Error then v else new Error(v))), 0
         fe = process.domain.bind(fe) if process?.domain?
     return thenResolver.call this, fx, fe, v, isError, cb
 X::done = stepWith 'done', doneResolver, true, true

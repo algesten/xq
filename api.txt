@@ -36,5 +36,9 @@ p.debounce([immed], n)
 X.poll ?
 
 p.all([] or {})
+
 p.any
 p.race
+
+p.takeWhile/until
+p.find
