@@ -344,8 +344,9 @@ X::singly  = X::oneByOne = stepWith 'singly',  forEachResolver, false, false, tr
 
 # resolver to handle .filter (x) ->. if returned value is truthy,
 # value is released down the chain.
-filterResolver = (fx, fe, v, isError, cb) ->
+filterResolver = (endOnFound) -> (fx, fe, v, isError, cb) ->
     return false if isError
+    _this = this
     filterCb = (vb, isError, ended) ->
         if isError
             cb vb, isError, ended
@@ -354,10 +355,13 @@ filterResolver = (fx, fe, v, isError, cb) ->
                 cb NVA, false, ended
             else if vb # truthy
                 cb v, false, ended # release original value
+                _this._doEnd() if endOnFound
             else
                 cb NVA, false, ended
     return thenResolver.call this, fx, fe, v, isError, filterCb
-X::filter = stepWith 'filter', filterResolver
+X::filter = stepWith 'filter', filterResolver false
+# cousin which stops the stream when value is found
+X::find   = stepWith 'find',   filterResolver true
 
 # resolver for handling deferreds in [] and {}
 allResolver = (snapshot) -> (fx, fe, v, isError, cb) ->
@@ -440,6 +444,7 @@ X.merge = (args...) -> X.binder (sink, end) ->
         .onEnd ->
             end() if ++ended == args.length)
     -> p._doEnd() for p in all
+
 
 # Recursively unwrap the given value. Callback when we got to the
 # bottom of it.

@@ -209,6 +209,8 @@ equivalent.
 
 * **p.filter(f)** apply function `f` to each value. If `f` returns a
   truthy, the original value will be released down the chain.
+* **p.find(f)** exactly like `filter`. but only the first value is
+  released down the chain, and step is closed.
 
 ## Everything is parallel
 

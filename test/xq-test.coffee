@@ -1284,3 +1284,39 @@ describe 'X', ->
                 f2.should.have.been.called
                 done()
             later -> stream.stop()
+
+    describe '.find', ->
+
+        isOdd = (n) -> n % 2 == 1
+
+        it 'returns the first value that the function is truthy for', (done) ->
+
+            X([0,1,2]).each().find(isOdd).then (v) ->
+                v.should.eql 1
+                done()
+            .done()
+
+        it 'closes the step when something is found', (done) ->
+
+            isOdd = (n) -> n % 2 == 1
+            (finder = X([0,1,2]).each().find(isOdd)).then ->
+                finder.isEnded().should.be.true
+                done()
+            .done()
+
+        it 'releases errors in filter function', (done) ->
+
+            X().filter (v) ->
+                v() # undefined
+            .fail (err) ->
+                done()
+            .done()
+
+        it 'skips errors', (done) ->
+
+            X.reject('fail').filter (v) ->
+                done('bad')
+            .fail (err) ->
+                err.should.eql 'fail'
+                done()
+            .done()
