@@ -161,14 +161,16 @@ module.exports = class X
         @_head = @_tail = null
 
         # invoke on end listeners
-        errs = (safeCall f for f in @_onEnd) if @_onEnd
+        v = @_value
+        isError = @_isError
+        errs = (safeCall f, v, isError for f in @_onEnd) if @_onEnd
         firstErr = errs.reduce(((prev, cur) -> prev || cur), null) if errs
 
         # forward the end
         @_forward FIN, false
 
         # throw any errors from listeners
-        throw firstErr if firstErr
+        setTimeout (-> throw firstErr if firstErr), 0
         return this
 
     # sets the value and propagates to chained promises
@@ -211,7 +213,7 @@ module.exports = class X
 #        console.log 'onEnd', @inspect()
         @_onEnd = [] unless @_onEnd
         @_onEnd.push f
-        err = safeCall f if @_isEnded
+        err = safeCall f, @_value, @_isError if @_isEnded
         throw err if err
         this
 
@@ -228,9 +230,9 @@ module.exports = class X
 X.toString = -> '[object X]'
 
 # to call a method and ignore errors
-safeCall = (f) ->
+safeCall = (f, args...) ->
     try
-        f()
+        f args...
         undefined
     catch err
         return err

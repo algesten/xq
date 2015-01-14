@@ -98,7 +98,7 @@ describe 'X', ->
         it 'is only ending the stream once', (done) ->
 
             def = X.defer()
-            def.promise.onEnd done
+            def.promise.onEnd -> done()
             def.end()
             def.end()
 
@@ -160,7 +160,7 @@ describe 'X', ->
 
             X.binder (sink, end) ->
                 end()
-            .onEnd done
+            .onEnd -> done()
 
         it 'returns undefined on both sink/end', (done) ->
 
@@ -651,7 +651,7 @@ describe 'X', ->
 
             X([0,1,2]).forEach().map (v) ->
                 v * 2
-            .onEnd done
+            .onEnd -> done()
 
         it 'waits with end until the end', (done) ->
 
@@ -683,7 +683,7 @@ describe 'X', ->
                 def.promise
             .then ->
                 c--
-            .onEnd done
+            .onEnd -> done()
             .done()
 
         it 'turns any incoming array which fails serially', (done) ->
@@ -697,7 +697,7 @@ describe 'X', ->
                 throw def.promise
             .fail ->
                 c--
-            .onEnd done
+            .onEnd -> done()
             .done()
 
         it 'is aliased to oneByOne', ->
@@ -761,6 +761,23 @@ describe 'X', ->
             finally
                 later -> process.on 'uncaughtException', lst for lst in lsts
 
+        it 'receives the last value', (done) ->
+
+            X([1,2,3]).forEach().onEnd (v, isError) ->
+                v.should.eql 3
+                isError.should.eql false
+                done()
+            .done()
+
+        it 'receives the last error', (done) ->
+
+            X([1,2,3]).forEach (v) ->
+                throw v
+            .onEnd (v, isError) ->
+                v.should.eql 3
+                isError.should.eql true
+                done()
+
         it 'throws when attaching if onEnd runs straight away', ->
 
             expect(->X().onEnd -> throw 'fail').to.throw 'fail'
@@ -774,7 +791,7 @@ describe 'X', ->
                 v.should.eql c1++
             .fail (v) ->
                 v.should.eql c2++
-            .onEnd done
+            .onEnd -> done()
             later -> def.push 0
             later -> def.pushError 0
             later -> def.push 1
@@ -922,7 +939,7 @@ describe 'X', ->
                 v.should.eql c
                 c += 2
             .done()
-            p.onEnd done
+            p.onEnd -> done()
             later -> def.resolve [0,1,2]
 
     describe '.endOnError', ->
@@ -946,7 +963,7 @@ describe 'X', ->
                 throw 'fail' if v == 1
                 v
             .endOnError()
-            .onEnd done
+            .onEnd -> done()
 
     describe '.all', ->
 
@@ -1217,7 +1234,7 @@ describe 'X', ->
             c = 0
             X.merge(def1.promise, def2.promise).then (v) ->
                 v.should.eql c++
-            .onEnd done
+            .onEnd -> done()
             later -> def1.push 0
             later -> def2.push 1
             later -> def1.end()
@@ -1244,7 +1261,7 @@ describe 'X', ->
             .fail (v) ->
                 v.should.eql c2++
                 null
-            .onEnd done
+            .onEnd -> done()
             later -> def1.push 0
             later -> def2.pushError 0
             later -> def1.pushError 1
