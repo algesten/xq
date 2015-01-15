@@ -1320,3 +1320,36 @@ describe 'X', ->
                 err.should.eql 'fail'
                 done()
             .done()
+
+    describe '.settle', ->
+
+        it 'waits to the end of the stream and releases the last value', (done) ->
+
+            X([0,1,2]).forEach().settle (v) ->
+                v.should.eql(2)
+                done()
+            .done()
+
+        it 'waits to the end of the stream and releases the last error', (done) ->
+
+            def = X.defer()
+            def.promise.settle().fail (e) ->
+                e.should.eql 2
+                done()
+            .done()
+            later -> def.pushError 0
+            later -> def.pushError 1
+            later -> def.pushError 2
+            later -> def.end()
+
+        it 'takes fail function as second argument', (done) ->
+
+            def = X.defer()
+            def.promise.settle null, (e) ->
+                e.should.eql 2
+                done()
+            .done()
+            later -> def.pushError 0
+            later -> def.pushError 1
+            later -> def.pushError 2
+            later -> def.end()

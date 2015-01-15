@@ -174,14 +174,14 @@ module.exports = class X
         return this
 
     # sets the value and propagates to chained promises
-    _setValue: (v, isError) ->
+    _setValue: (v, isError, noforward) ->
 #        console.log 'setValue', v, isError, @inspect()
         # ended takes no more values and NVA is emitted from some
         # resolver to indicate no value.
         return this if @_isEnded or v == NVA
         @_value   = v
         @_isError = isError
-        @_forward v, isError
+        @_forward v, isError unless noforward
 
     # propagates the given value/error to chained promises _exec
     # functions.
@@ -432,6 +432,31 @@ X::once = stepWith 'once', onceResolver
 
 # a serial resolver is like a then but one argument at a time.
 X::serial = stepWith 'serial', thenResolver, true, false, true
+
+# a promise for the end of the stream. no events pass except the last
+# one before the end.
+settleResolver = (fx, fe, v, isError, cb) ->
+    unless @_settle
+        _this = this
+        # replace _doEnd with handler sneaking in the thenResolver
+        # before actually effectuating the doEnd
+        real = @_doEnd
+        handleCb = (v, isError) ->
+            _this._setValue v, isError
+            real()
+            # restore
+            _this._doEnd = real
+        @_doEnd = ->
+            thenResolver.call _this, fx, fe, _this._value, _this._isError, handleCb
+    @_settle = true
+    # reset exec count so we are not expected to exit through
+    # _resolverExit.
+    @_execCount = 0
+    # and set the value back without forwarding
+    @_setValue v, isError, true
+    return true
+X::settle = stepWith 'settle', settleResolver, true
+
 
 # a merge of streams
 X.merge = (args...) -> X.binder (sink, end) ->

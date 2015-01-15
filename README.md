@@ -166,8 +166,11 @@ equivalent.
   argument is executed at a time. Additional events are buffered up
   and executed one by one. See section on
   [everything being parallel](#everything-is-parallel).
-* **p.once(fx)** returns a promise for the first event/value from a
+* **p.once(fx)** promise for the first event/value from a
   stream/promise. Automatcially ends when first value is received.
+* **p.settle(fx[,fe])** promise for the last event/value from a
+  stream/promise. will effectively block a stream to settle before
+  releasing. arguments like `.then`
 
 ### Arrays and Objects
 
