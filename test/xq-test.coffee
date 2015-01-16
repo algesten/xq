@@ -1367,3 +1367,9 @@ describe 'X', ->
             later -> def.pushError 1
             later -> def.pushError 2
             later -> def.end()
+
+        it 'obviously settles only once for streams', ->
+            X([0,1,2]).forEach().settle()
+
+        it 'obviously settles only once for promises', ->
+            X(1).settle()

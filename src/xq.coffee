@@ -174,14 +174,14 @@ module.exports = class X
         return this
 
     # sets the value and propagates to chained promises
-    _setValue: (v, isError, noforward) ->
+    _setValue: (v, isError) ->
 #        console.log 'setValue', v, isError, @inspect()
         # ended takes no more values and NVA is emitted from some
         # resolver to indicate no value.
         return this if @_isEnded or v == NVA
         @_value   = v
         @_isError = isError
-        @_forward v, isError unless noforward
+        @_forward v, isError
 
     # propagates the given value/error to chained promises _exec
     # functions.
@@ -441,13 +441,14 @@ settleResolver = (fx, fe, v, isError, cb) ->
             # restore
             _this._doEnd = real
         @_doEnd = ->
-            thenResolver.call _this, fx, fe, _this._value, _this._isError, handleCb
-    @_settle = true
+            # pick up last value/error
+            {v, isError} = _this._settle
+            thenResolver.call _this, fx, fe, v, isError, handleCb
+    # save value for the future
+    @_settle = {v, isError}
     # reset exec count so we are not expected to exit through
     # _resolverExit.
     @_execCount = 0
-    # and set the value back without forwarding
-    @_setValue v, isError, true
     return true
 X::settle = stepWith 'settle', settleResolver, true
 
