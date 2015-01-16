@@ -438,14 +438,12 @@ describe 'X', ->
                 done() if n == 2
             .done()
             def2 = X.defer()
-            def3 = X.defer()
-            def2.push def3.promise
-            def.push def3.promise.then (v) ->
+            def.push def2.promise.then (v) ->
                 defnew = X.defer()
                 later -> defnew.resolve v + 100
                 defnew.promise
-            later -> def3.push 42
-            later -> def3.push 43
+            later -> def2.push 42
+            later -> def2.push 43
 
         it 'handles failed deferreds created on the fly', (done) ->
 
@@ -456,14 +454,24 @@ describe 'X', ->
                 done() if n == 2
             .done()
             def2 = X.defer()
-            def3 = X.defer()
-            def2.push def3.promise
-            def.pushError def3.promise.then (v) ->
+            def.pushError def2.promise.then (v) ->
                 defnew = X.defer()
                 later -> defnew.reject v + 100
                 defnew.promise
-            later -> def3.push 42
-            later -> def3.push 43
+            later -> def2.push 42
+            later -> def2.push 43
+
+        it 'handles streams created on the fly', (done) ->
+
+            (p = X(0).then ->
+                X.binder (sink) ->
+                    later -> sink 1
+                    later -> sink 2
+                    later -> sink 3
+            ).then (v) ->
+                p.isEnded().should.be.false
+                done() if v == 3
+            .done()
 
     describe '.fail', ->
 
@@ -1079,6 +1087,12 @@ describe 'X', ->
             later -> def1.push 41
             later -> def1.push 55
             later -> def2.push 42
+
+        it 'ends when it should end', (done) ->
+
+            X.all(t:X(true)).then ({t}) ->
+                t.should.be.true
+            .onEnd -> done()
 
     describe '.snapshot', ->
 

@@ -370,24 +370,20 @@ allResolver = (snapshot) -> (fx, fe, v, isError, cb) ->
         arr = v
         val = (k) -> k
         result =  Array.apply(null, Array(v.length)).map -> NVA
-        unsubs = []
-        r = (k, idx, val, unsub) ->
+        r = (k, idx, val) ->
             isNew = result[idx] == NVA
             return false unless snapshot or isNew
             result[idx] = val
-            unsubs.push unsub
             isNew
     else if typeof v == 'object' and not isDeferred(v)
         # a plain object
         arr = Object.keys(v)
         val = (k) -> v[k]
         result = {}
-        unsubs = []
-        r = (k, idx, val, unsub) ->
+        r = (k, idx, val) ->
             isNew = !result.hasOwnProperty(k)
             return false unless snapshot or isNew
             result[k] = val
-            unsubs.push unsub
             isNew
     if arr?.reduce ((prev,cur) -> prev || isDeferred(val(cur))), false
         done = 0
@@ -395,18 +391,17 @@ allResolver = (snapshot) -> (fx, fe, v, isError, cb) ->
         stop = false
         arr.every (k, idx) ->
             a = val(k)
-            unwrap a, false, (ua, isError, ended, unsub) ->
+            unwrap a, false, (ua, isError, ended) ->
                 return if stop
                 if isError
                     stop = true
                     cb ua, true  # break on first error
                     return
                 return if ua == NVA
-                done++ if r k, idx, ua, unsub
+                done++ if r k, idx, ua
                 if arr.length == done
                     stop = true
-                    # unsubscribe all wrapped
-                    u() for u in unsubs
+                    # TODO unsubscribe all resolvers here
                     return thenResolver.call _this, fx, fe, result, false, cb
                 null
             return true
@@ -423,10 +418,9 @@ onceResolver = (fx, fe, v, isError, cb) ->
     # eat up
     return true if @_once
     @_once = true
-    endCb = (v, isError, ended, unsub) ->
+    endCb = (v, isError, ended) ->
         cb v, isError, true
         _this._doEnd()
-        unsub()
     return thenResolver.call this, fx, fe, v, isError, endCb
 X::once = stepWith 'once', onceResolver
 
@@ -473,28 +467,32 @@ X.merge = (args...) -> X.binder (sink, end) ->
 
 # Recursively unwrap the given value. Callback when we got to the
 # bottom of it.
-unwrap = (v, isError, cb, ended = true, prevUnsub = (->)) ->
-    unsub = prevUnsub
+unwrap = (v, isError, cb) ->
+    acc = []
+    endCb = (v, isError, ended) ->
+        cb v, isError, ended
+        p.stop() for p in acc if ended
+    doUnwrap acc, v, isError, endCb
+doUnwrap = (acc, v, isError, cb, ended = true) ->
     if v instanceof X
-        al = v._always (v, isError) ->
-            unsub = -> prevUnsub(); al._doEnd()
-            unwrap v, isError, cb, false, unsub
+        acc.push v._always (v, isError) ->
+            doUnwrap acc, v, isError, cb, false
             return null # important or we get endless loops
-        v.onEnd -> unwrap NVA, false, cb, ended, unsub
-    else if t = isThenable v, ((err) -> unwrap err, true, cb, ended, unsub)
+        v.onEnd -> doUnwrap acc, NVA, false, cb, ended
+    else if t = isThenable v, ((err) -> doUnwrap acc, err, true, cb, ended)
         return if t == true # err handler ran
         got = false
         try
             f = (isError) ->
                 (x) ->
-                    return if got; got = true; unwrap x, isError, cb, ended, unsub
+                    return if got; got = true; doUnwrap acc, x, isError, cb, ended
             t.call v, f(false), f(true)
         catch err
             return if got
             got = true
-            unwrap err, true, cb, ended, unsub
+            doUnwrap acc, err, true, cb, ended
     else
-        cb v, isError, ended, unsub
+        cb v, isError, ended
 
 # retry the promise producing function f at most max times.
 X.retry = (max, delay, f) ->
