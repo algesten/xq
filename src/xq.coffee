@@ -279,7 +279,7 @@ makeResolver = (mode) -> (fx, fe, v, isError, cb) ->
 # Makes a new promise chained off this with given resolver.
 unitFx = (x) -> x
 unitFe = (e) -> throw e
-stepWith = (type, resolver, twoF, finish, serial, immediate) -> (fx, fe) ->
+stepWith = (type, resolver, twoF, finish, serial, immediate, extra) -> (fx, fe) ->
     fx = unitFx unless typeof fx == 'function'
     fe = unitFe unless typeof fe == 'function'
     p = new X(INI)
@@ -289,6 +289,7 @@ stepWith = (type, resolver, twoF, finish, serial, immediate) -> (fx, fe) ->
     p._fe = fe if twoF
     p._serial = !!serial
     p._immediate = !!immediate
+    extra.call p if extra
     @_addNext p
     return if finish then undefined else p
 
@@ -430,28 +431,26 @@ X::serial = stepWith 'serial', thenResolver, true, false, true
 # a promise for the end of the stream. no events pass except the last
 # one before the end.
 settleResolver = (fx, fe, v, isError, cb) ->
-    unless @_settle
-        _this = this
-        # replace _doEnd with handler sneaking in the thenResolver
-        # before actually effectuating the doEnd
-        real = @_doEnd
-        handleCb = (v, isError) ->
-            _this._setValue v, isError
-            real()
-            # restore
-            _this._doEnd = real
-        @_doEnd = ->
-            # pick up last value/error
-            {v, isError} = _this._settle
-            thenResolver.call _this, fx, fe, v, isError, handleCb
     # save value for the future
     @_settle = {v, isError}
     # reset exec count so we are not expected to exit through
     # _resolverExit.
     @_execCount = 0
     return true
-X::settle = stepWith 'settle', settleResolver, true
-
+X::settle = stepWith 'settle', settleResolver, true, false, false, false, ->
+    _this = this
+    # replace _doEnd with handler sneaking in the thenResolver
+    # before actually effectuating the doEnd
+    real = @_doEnd
+    handleCb = (v, isError) ->
+        _this._setValue v, isError
+        real()
+        # restore
+        _this._doEnd = real
+    @_doEnd = ->
+        # pick up last value/error
+        {v, isError} = (_this._settle ? {v:undefined, isError:false})
+        thenResolver.call _this, _this._fx, _this._fe, v, isError, handleCb
 
 # a merge of streams
 X.merge = (args...) -> X.binder (sink, end) ->

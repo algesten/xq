@@ -860,6 +860,18 @@ describe 'X', ->
                 done()
             .done()
 
+        it 'propagates end with no value released', (done) ->
+
+            X([0,1,2]).forEach().filter ->
+                false
+            .onEnd -> done()
+
+        it 'propagates end with value released', (done) ->
+
+            X([0,1,2]).forEach().filter (v) ->
+                v == 1
+            .onEnd -> done()
+
     describe 'other then-able', ->
 
         it 'can wrap another resolved then-able', (done) ->
@@ -1373,3 +1385,7 @@ describe 'X', ->
 
         it 'obviously settles only once for promises', ->
             X(1).settle()
+
+        it 'releases undefined if no value before stream end', ->
+
+            X([0,1]).forEach().filter(->false).settle()
