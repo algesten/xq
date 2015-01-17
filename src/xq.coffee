@@ -279,7 +279,7 @@ makeResolver = (mode) -> (fx, fe, v, isError, cb) ->
 # Makes a new promise chained off this with given resolver.
 unitFx = (x) -> x
 unitFe = (e) -> throw e
-stepWith = (type, resolver, twoF, finish, serial, immediate, extra) -> (fx, fe) ->
+stepWith = (type, resolver, twoF, finish, extra) -> (fx, fe) ->
     fx = unitFx unless typeof fx == 'function'
     fe = unitFe unless typeof fe == 'function'
     p = new X(INI)
@@ -287,8 +287,6 @@ stepWith = (type, resolver, twoF, finish, serial, immediate, extra) -> (fx, fe) 
     p._resolver = resolver
     p._fx = fx
     p._fe = fe if twoF
-    p._serial = !!serial
-    p._immediate = !!immediate
     extra.call p if extra
     @_addNext p
     return if finish then undefined else p
@@ -301,7 +299,7 @@ X::then    = X::map   = stepWith 'then', thenResolver, true
 X::fail    = X::catch = stepWith 'fail', failResolver
 X::always  = X::fin = X::finally = stepWith 'always', alwaysResolver
 # internal always-resolver to not confuse things
-X::_always = stepWith 'always', alwaysResolver, true, false, false, true
+X::_always = stepWith 'always', alwaysResolver, true, false, -> @_immediate = true
 
 # spread is like then
 X::spread = stepWith 'spread', (fx, fe, v, isError, cb) ->
@@ -339,9 +337,9 @@ forEachResolver = (fx, fe, v, isError, cb) ->
     # kick of serial execution
     cb NVA, false, true if @_serial
     return true
-X::forEach = X::each     = stepWith 'forEach', forEachResolver, false, false, false
+X::forEach = X::each     = stepWith 'forEach', forEachResolver, false, false
 # The serial version
-X::singly  = X::oneByOne = stepWith 'singly',  forEachResolver, false, false, true
+X::singly  = X::oneByOne = stepWith 'singly',  forEachResolver, false, false, -> @_serial = true
 
 # resolver to handle .filter (x) ->. if returned value is truthy,
 # value is released down the chain.
@@ -426,7 +424,7 @@ onceResolver = (fx, fe, v, isError, cb) ->
 X::once = stepWith 'once', onceResolver
 
 # a serial resolver is like a then but one argument at a time.
-X::serial = stepWith 'serial', thenResolver, true, false, true
+X::serial = stepWith 'serial', thenResolver, true, false, -> @_serial = true
 
 # a promise for the end of the stream. no events pass except the last
 # one before the end.
@@ -437,7 +435,7 @@ settleResolver = (fx, fe, v, isError, cb) ->
     # _resolverExit.
     @_execCount = 0
     return true
-X::settle = stepWith 'settle', settleResolver, true, false, false, false, ->
+X::settle = stepWith 'settle', settleResolver, true, false, ->
     _this = this
     # replace _doEnd with handler sneaking in the thenResolver
     # before actually effectuating the doEnd
