@@ -1389,3 +1389,63 @@ describe 'X', ->
         it 'releases undefined if no value before stream end', ->
 
             X([0,1]).forEach().filter(->false).settle()
+
+    describe '.oi', ->
+
+        it 'can take a single argument function (o)->', ->
+
+            X().oi (o) ->
+                o.p = X.resolver (resolve, reject) ->
+                    later -> resolve(42)
+            .then ({p}) ->
+                p.should.eql 42
+
+        it 'can take a dual argument function (i,o)->', ->
+
+            X({a:1}).oi ({a}, o) ->
+                a.should.eql 1
+                o.p = X.resolver (resolve, reject) ->
+                    later -> resolve(42)
+            .then ({a,p}) ->
+                a.should.eql 1
+                p.should.eql 42
+
+        it 'can return a promise (which is ignored)', ->
+            p = null
+            X({a:1}).oi ({a}, o) ->
+                p = X.resolver (resolve, reject) ->
+                    later -> resolve(42)
+            .then ({a}) ->
+                a.should.eql 1
+                p.isFulfilled().should.be.true
+
+        it 'is a new object out', ->
+            i = {a:1}
+            X(i).oi ({a}, o) ->
+                o.b = 2
+            .then (i1) ->
+                i1.a.should.eql 1
+                i1.b.should.eql 2
+                i1.should.not.equal i
+
+        it 'can fail miserably', ->
+
+            X().oi (o) ->
+                throw 'fail'
+            .fail (err) ->
+                err.should.eql 'fail'
+
+        it 'can fail later', ->
+
+            X().oi (o) ->
+                X.resolver (resolve, reject) -> later -> reject 'fail'
+            .fail (err) ->
+                err.should.eql 'fail'
+
+        it 'can fail in o.promise', ->
+
+            X().oi (o) ->
+                o.p = X.resolver (resolve, reject) -> later -> reject 'fail'
+                return null
+            .fail (err) ->
+                err.should.eql 'fail'

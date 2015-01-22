@@ -3,8 +3,6 @@ XQ - Reactive Promises
 
 [![Build Status](https://travis-ci.org/algesten/xq.svg)](https://travis-ci.org/algesten/xq) [![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/algesten/xq)
 
-
-
 XQ is a hybrid between promises and reactive extensions. Its core is a
 [Promises/A+](https://promisesaplus.com/) compliant promises
 implementation that can also function as a stream.
@@ -118,6 +116,11 @@ equivalent.
 
 `def = X.defer(); def.push(2); def.end(); def.promise`
 
+## OI `.oi(f)`
+
+OI is a helper for passing multiple values through a promise/event
+chain. Read [about OI](oi.md).
+
 ## API
 
 ### Instantiation
@@ -201,6 +204,8 @@ equivalent.
   first. See section about the difference between
   [all or snapshot](#all-or-snapshot).
 * **X.snapshot** same as `X(v).snapshot()`.
+* **X.oi(f)** chaining helper function with signature `(i,o)`. See
+  [oi doc](oi.md).
 
 ### Multiple
 

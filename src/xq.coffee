@@ -450,6 +450,30 @@ X::settle = stepWith 'settle', settleResolver, true, false, ->
         {v, isError} = (_this._settle ? {v:undefined, isError:false})
         thenResolver.call _this, _this._fx, _this._fe, v, isError, handleCb
 
+# The .oi helper
+oiResolver = (fx, fe, i, isError, cb) ->
+    return false unless fx
+    o = {}
+    r = null
+    try
+        if fx.length == 1
+            r = fx(o)
+        else
+            r = fx(i, o)
+        X(r).settle ->
+            X.all(o).then (ro) ->
+                cb _mixin(i, ro), false
+            .fail (err) ->
+                cb err, true
+                return null
+        .fail (err) ->
+            cb err, true
+    catch err
+        X(err).then (err) -> cb err, true
+    return true
+X::oi = stepWith 'oi', oiResolver
+
+
 # a merge of streams
 X.merge = (args...) -> X.binder (sink, end) ->
     ended = 0
@@ -496,3 +520,6 @@ doUnwrap = (acc, v, isError, cb, ended = true) ->
 X.retry = (max, delay, f) ->
     X._retry = new (require './retry') unless X._retry
     X._retry.try max, delay, f
+
+_merge  = (t, os...) -> t[k] = v for k,v of o when v != undefined for o in os; t
+_mixin  = (os...)    -> _merge {}, os...
