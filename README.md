@@ -202,7 +202,7 @@ chain. Read [about OI](oi.md).
 * **X.all(v)** same as `X(v).all()`.
 * **p.snapshot(fx)** like `.all`, but uses *current value* instead of
   first. See section about the difference between
-  [all or snapshot](#-all-or-snapshot).
+  [all or snapshot](#all-or-snapshot).
 * **X.snapshot** same as `X(v).snapshot()`.
 * **X.oi(f)** chaining helper function with signature `(i,o)`. See
   [oi doc](oi.md).
@@ -307,7 +307,7 @@ p3 = makePromise()
 X([p1,p2,p3]).forEach (p) -> p.then(doSomething)...
 ```
 
-#### .forEach().serial() is not serial
+#### forEach().serial() is not serial
 
 A mistaken attempt at fixing this would be to use `serial`, as in
 `.forEach().serial (p) ->...` but this does not work. Having no
@@ -316,7 +316,7 @@ deferred would be unwrapped on the exit of that `forEach`-step. This
 means all deferred have been unwrapped in parallel already before the
 invocation of `.serial()`.
 
-#### .singly() does things serially.
+#### singly() does things serially.
 
 `.singly()` (or alias `.oneByOne()`)is a serialized version of
 `.forEach()`.
@@ -336,7 +336,7 @@ another. That means `.singly (v) -> X(doSomething(v))` would wait with
 feeding another value to the function until the previous has been
 unwrapped. The same goes for the non-argument `.singly()`.
 
-## .all or .snapshot
+## all or snapshot
 
 `.all` takes the first value `.snapshot` takes the current. This can
 be illustrated in beautiful yet informative ascii art.
