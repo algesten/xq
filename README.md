@@ -202,7 +202,7 @@ chain. Read [about OI](oi.md).
 * **X.all(v)** same as `X(v).all()`.
 * **p.snapshot(fx)** like `.all`, but uses *current value* instead of
   first. See section about the difference between
-  [all or snapshot](#all-or-snapshot).
+  [all or snapshot](#-all-or-snapshot).
 * **X.snapshot** same as `X(v).snapshot()`.
 * **X.oi(f)** chaining helper function with signature `(i,o)`. See
   [oi doc](oi.md).
