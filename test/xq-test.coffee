@@ -674,6 +674,15 @@ describe 'X', ->
                 f.should.have.been.calledThrice
                 done()
 
+        it 'is ok with array of array', (done) ->
+
+            c = 1
+            X([[1,2],[3,4]]).each f = spy ([a,b]) ->
+                b.should.eql a + 1
+            .onEnd ->
+                f.callCount.should.eql 2
+                done()
+
         it 'is aliased to each', ->
 
             X::forEach.should.equal X::each
@@ -691,8 +700,27 @@ describe 'X', ->
                 def.promise
             .then ->
                 c--
+            .onEnd ->
+                c.should.eql 0
+                done()
+            .done()
+
+        it 'works with events of events', (done) ->
+
+            c = 0
+            X([0,1,2,3,4,5]).singly (v) ->
+                c++
+                c.should.eql 1
+                X([v..(v+4)]).singly (v2) ->
+                    def = X.defer()
+                    later -> def.resolve v
+                    def.promise
+                .settle()
+            .then ->
+                c--
             .onEnd -> done()
             .done()
+
 
         it 'turns any incoming array which fails serially', (done) ->
 
