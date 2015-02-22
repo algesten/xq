@@ -3,7 +3,7 @@ mocha = require 'mocha'
 
 adapter = {
     resolved: X
-    rejected: X.rejrect
+    rejected: X.reject
     deferred: -> X.defer()
 }
 

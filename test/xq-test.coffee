@@ -1,227 +1,287 @@
-chai   = require 'chai'
-expect = chai.expect
-chai.should()
-chai.use(require 'sinon-chai')
-{ assert, spy, match, mock, stub, sandbox } = require 'sinon'
-Q = require 'q'
-
 X = require '../src/xq'
 
-later = (f) -> setTimeout f, 5
+TYPES = [
+    {n:'null',       v:null}
+    {n:'undefined',  v:undefined}
+    {n:'number(0)',  v:0}
+    {n:'number'   ,  v:1}
+    {n:'string("")', v:''}
+    {n:'string',     v:'panda'}
+    {n:'boolean(f)', v:false}
+    {n:'boolean'   , v:true}
+    {n:'object'    , v:{panda:42}}
+    {n:'array'     , v:[1,2,3]}
+]
 
 describe 'X', ->
 
-    describe 'value instantiation', ->
+    describe 'instantiate promise', ->
 
-        it 'is done X(x)', ->
+        TYPES.forEach (t) ->
 
-            px = X(x = 42)
-            px.isEnded().should.eql true
+            describe "for #{t.n}", ->
 
-        it 'is also ok with nothing', (done) ->
+                it "is done X(v)", (done) ->
+                    X(t.v).then (v) ->
+                        eql v, t.v
+                        done()
 
-            px = X()
-            px.isEnded().should.eql true
-            px.then done
+                it "is done X.resolve(v)", (done) ->
+                    X.resolve(t.v).then (v) ->
+                        eql v, t.v
+                        done()
 
-        it 'nested 2 levels are fine', (done) ->
+                it "is done X.reject(v)", (done) ->
+                    X.reject(t.v).then null, (v) ->
+                        eql v, t.v
+                        done()
 
-            px = X(X(42))
-            px.isEnded().should.eql true
-            px.then (v) ->
-                v.should.eql 42
-                done()
-            .done()
+                it "is done X.defer(); def.resolve", (done) ->
+                    def = X.defer()
+                    def.promise.then (v) ->
+                        eql v, t.v
+                        done()
+                    later ->
+                        r = def.resolve t.v
+                        eql r, undefined
 
-        it 'nested 3 levels are fine', (done) ->
+                it "is done X.defer(); def.reject", (done) ->
+                    def = X.defer()
+                    def.promise.then null, (v) ->
+                        eql v, t.v
+                        done()
+                    later ->
+                        r = def.reject t.v
+                        eql r, undefined
 
-            px = X(X(X(42)))
-            px.isEnded().should.eql true
-            px.then (v) ->
-                v.should.eql 42
-                done()
-            .done()
+                it "is done X.resolver(f); resolve", (done) ->
+                    X.resolver (resolve, reject) ->
+                        r = resolve t.v
+                        eql r, undefined
+                    .then (v) ->
+                        eql v, t.v
+                        done()
 
-        it 'nested deferred is interesting', (done) ->
+                it "is done X.resolver(f); reject", (done) ->
+                    X.resolver (resolve, reject) ->
+                        r = reject t.v
+                        eql r, undefined
+                    .then null, (v) ->
+                        eql v, t.v
+                        done()
 
-            def = X.defer()
-            px = X(def.promise)
-            c = 42
-            px.isEnded().should.be.false
-            px.then (v) ->
-                v.should.eql c++
-            .onEnd ->
-                px.isEnded().should.be.true
-                done()
-            later -> def.push 42
-            later -> def.push 43
-            later -> def.end()
+    describe 'instantiate event emitter', ->
 
-    describe 'error instantiation', ->
+        TYPES.forEach (t) ->
 
-        it 'is done X.reject(e)', ->
+            describe "for #{t.n}", ->
 
-            pe = X.reject(e = new Error('wrong'))
-            pe.isEnded().should.eql true
+                it 'is done X.defer(); def.push(); def.end();', (done) ->
+                    def = X.defer()
+                    later ->
+                        r = def.push 1
+                        eql r, undefined
+                    later -> def.push 2
+                    later -> def.push 3
+                    later ->
+                        r = def.end()
+                        eql r, undefined
+                    c = 1
+                    def.promise.then (v) ->
+                        eql v, c++
+                        v
+                    .settle (v) ->
+                        eql v, 3
+                        done()
 
-        it 'is ok with nothing', (done) ->
+                it 'is done X.defer(); def.shove(); def.end();', (done) ->
+                    def = X.defer()
+                    later ->
+                        r = def.shove 1
+                        eql r, undefined
+                    later -> def.shove 2
+                    later -> def.shove 3
+                    later ->
+                        r = def.end()
+                        eql r, undefined
+                    c = 1
+                    def.promise.fail (v) ->
+                        eql v, c++
+                        throw v
+                    .settle null, (v) ->
+                        eql v, 3
+                        done()
 
-            pe = X.reject()
-            pe.isEnded().should.eql true
-            pe.fail done
+                it 'is done X.binder (sink, ender) -> sink(v)', (done) ->
+                    c = 1
+                    X.binder (sink, end) ->
+                        later ->
+                            r = sink 1
+                            eql r, undefined
+                        later -> sink 2
+                        later -> sink 3
+                        later ->
+                            r = end()
+                            eql r, undefined
+                    .then (v) ->
+                        eql v, c++
+                        v
+                    .settle (v) ->
+                        eql v, 3
+                        done()
 
-    describe 'defer instantiation', ->
+                it 'is done X.binder (sink, ender) -> sink(v,true)', (done) ->
+                    c = 1
+                    X.binder (sink, end) ->
+                        later ->
+                            r = sink 1, true
+                            eql r, undefined
+                        later -> sink 2, true
+                        later -> sink 3, true
+                        later -> end()
+                    .fail (v) ->
+                        eql v, c++
+                        v
+                    .settle (v) ->
+                        eql v, 3
+                        done()
 
-        it 'is done X.defer()', ->
+    describe 'misc', ->
 
-            def = X.defer()
+        it 'thenable for a thenable', (done) ->
 
-        it 'can optionally take an initial value', ->
-
-            def = X.defer(x = 42)
-
-    describe 'def.promise', ->
-
-        it 'is used to get X from def', ->
-
-            def = X.defer()
-            expect(def.promise).to.be.instanceof X
-            def.promise._def.should.equal def
-
-        it 'should not be ended', ->
-
-            def = X.defer()
-            def.promise.isEnded().should.eql false
-
-    describe 'def.end()', ->
-
-        it 'is only ending the stream once', (done) ->
-
-            def = X.defer()
-            def.promise.onEnd -> done()
-            def.end()
-            def.end()
-
-    describe '.resolver', (done) ->
-
-        it 'is used to create a resolve a promise resolved by a function', (done) ->
-
-            X.resolver (resolve, reject) ->
-                later -> resolve(42)
+            X(42).then (v) ->
+                def = X.defer()
+                later -> def.resolve 42
+                X(def.promise)
             .then (v) ->
-                v.should.eql 42
+                eql v, 42
                 done()
             .done()
 
-        it 'is used to create a resolve a promise rejected by a function', (done) ->
+        it 'thenable for a thenable that resolves then resolves again', (done) ->
 
-            X.resolver (resolve, reject) ->
-                later -> reject(42)
-            .fail (v) ->
-                v.should.eql 42
-                done()
-            .done()
-
-        it 'returns undefined on both resolve/reject', (done) ->
-
-            X.resolver (resolve, reject) ->
-                expect(resolve(42)).to.be.undefined
-                expect(reject(42)).to.be.undefined
-                done()
-            .done()
-
-    describe '.binder', (done) ->
-
-        it 'is used to bind an event emitter using a sink function', (done) ->
-
-            c = 42
-            X.binder (sink) ->
-                later -> sink 42
-                later -> sink 43
-                later -> sink 44
+            X(42).then (v) ->
+                then: (onFulfilled) ->
+                    onFulfilled v * 2
+                    throw 'bad'
             .then (v) ->
-                v.should.eql c++
-                done() if v == 44
+                eql v, 84
+                done()
+
+        it 'promise and x same', (done) ->
+
+            p = X(42).then -> p
+
+            p.fail (e) ->
+                assert.ok e instanceof TypeError
+                done()
+
+    describe 'event emitter', ->
+
+        it 'can attach then after first push', (done) ->
+            def = X.defer()
+            def.push 42
+            def.promise.then (v) ->
+                eql v, 42
+                eql def.promise.isEnded(), false
+                done()
             .done()
 
-        it 'is possible to use sink function to emit errors', (done) ->
+        it 'does not receive more events after end', ->
+            def = X.defer()
+            def.push 42
+            def.promise.then (v) ->
+                eql v, 42
+                eql def.promise.isEnded(), false
+                done()
+            def.end()
+            def.push 43
 
-            c = 42
+        it 'is parallel', (done) ->
+            def = X.defer()
+            inThen = 0
+            def.promise.then (v) ->
+                inThen++
+                done() if inThen == 3
+                X.resolver (resolve) -> later -> resolve v
+            .then (v) ->
+                inThen--
+            def.push 1
+            def.push 2
+            def.push 3
+
+        it 'can push resolved deferreds', (done) ->
+            def = X.defer()
+            def.promise.then (v) ->
+                eql v, 42
+                done()
+            .done()
+            def.push X(42)
+
+        it 'can push unresolved deferreds', (done) ->
+            def = X.defer()
+            def.promise.then (v) ->
+                eql v, 42
+                done()
+            .done()
+            def.push X.resolver (resolve) -> later ->  resolve 42
+
+    describe 'done', ->
+
+        lsts = null
+
+        beforeEach ->
+            lsts = process.listeners 'uncaughtException'
+            process.removeAllListeners 'uncaughtException'
+
+        afterEach ->
+            process.removeAllListeners 'uncaughtException'
+            process.on 'uncaughtException', lst for lst in lsts
+
+        it 'finishes a chain', ->
+            eql X(42).done(), undefined
+
+        it 'functions as then for fx', (done) ->
+            X(42).done (v) ->
+                eql v, 42
+                done()
+
+        it 'functions as then for fe', (done) ->
+            X.reject(42).done null, (v) ->
+                eql v, 42
+                done()
+
+        it 'throws unhandled errors', (done) ->
+            err = new Error('panda')
+            process.on 'uncaughtException', (e) ->
+                eql e, err
+                done()
+            X.reject(err).done()
+
+        it 'throws error values as Error(v)', (done) ->
+            err = '42'
+            process.on 'uncaughtException', (e) ->
+                assert.ok e instanceof Error
+                eql '42', e.message
+                done()
+            X.reject(err).done()
+
+        it 'throws every error event', (done) ->
+            c = 1
+            process.on 'uncaughtException', (e) ->
+                eql String(c++), e.message
+                done() if c == 4
             X.binder (sink) ->
-                later -> sink 42, true
-                later -> sink 43, true
-                later -> sink 44, true
-            .fail (v) ->
-                v.should.eql c++
-                done() if v == 44
+                later -> sink 1, true
+                later -> sink 2, true
+                later -> sink 3, true
             .done()
 
-        it 'receives a second argument which ends the stream', (done) ->
+###
 
-            X.binder (sink, end) ->
-                end()
-            .onEnd -> done()
+describe.skip 'X', ->
 
-        it 'returns undefined on both sink/end', (done) ->
-
-            X.binder (sink, end) ->
-                expect(sink(0)).to.be.undefined
-                expect(end()).to.be.undefined
-                done()
-
-        it 'can optionally return an unsubscribe function', (done) ->
-
-            c = 42
-            p = X.binder (sink, end) ->
-                later -> sink 42
-                later -> sink 43
-                later -> sink 44
-                later -> end()
-                -> done()
-
-            p.then (v) -> v.should.eql c++
-
-    describe 'errors', ->
-
-        it 'are silently consumed', ->
-
-            X.reject(42)
-            null
-
-        it 'stops the chain with done', ->
-
-            expect(X(42).done()).to.be.undefined
-
-        it 'are reported if .done', (done) ->
-
-            X.reject(e = new Error('fail')).done (->), (v) ->
-                v.should.equal e
-                done()
-
-        it 'is different for defers with later done', (done) ->
-
-            def = X.defer()
-            def.reject('fail')
-            def.promise.done (->), (v) ->
-                v.should.eql 'fail'
-                done()
-
-        it 'is different for defers with done then rejected', (done) ->
-
-            def = X.defer()
-            def.promise.done (->), (v) ->
-                v.should.eql 'fail'
-                done()
-            later -> def.reject('fail')
-
-        it 'works fine with deep errors', (done) ->
-
-            X().then ->
-                throw new Error('fail')
-            .fail (v) ->
-                throw v
-            .done (->), (v) ->
-                done()
 
     describe '.then', ->
 
@@ -1477,3 +1537,5 @@ describe 'X', ->
                 return null
             .fail (err) ->
                 err.should.eql 'fail'
+
+###
