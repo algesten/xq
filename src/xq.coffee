@@ -9,11 +9,12 @@ cnt = 0
 
 module.exports = class X
 
-    parent:  undefined  # parent step
-    childs:  undefined  # next steps
-    value:   undefined  # resolved value of step
-    iserr:   false      # whether step was an error
-    ended:   false      # whether promise is ended
+    parent:   undefined  # parent step
+    childs:   undefined  # next steps
+    value:    undefined  # resolved value of step
+    iserr:    false      # whether step was an error
+    ended:    false      # whether promise is ended
+    endonerr: false      # whether we end on first error
 
     constructor: (v) ->
         return new X(v) unless this instanceof X
@@ -57,7 +58,7 @@ module.exports = class X
     _push:  (v, iserr) -> @_exec v, iserr
 
     _set: (v, iserr) =>
-#        console.log 'set', v, !!iserr, @inspect()
+ #       console.log 'set', v, !!iserr, @inspect()
         return if @ended
         if v == fin
             @ended = true
@@ -76,8 +77,17 @@ module.exports = class X
     _exec: (v, iserr) ->
 #        console.log 'exec', v, !!iserr, @inspect()
         return if v == ini
+        return if @ended
         @step v, iserr, @_set
         undefined
+
+    endOnError: ->
+        @endonerr = true
+        this
+
+    stop: ->
+        @_set fin
+        this
 
     toString: -> '[object Promise]'
 
@@ -114,7 +124,7 @@ thenstep = (fx, fe) ->
         wout = (v, iserr) ->
             --count
             out v, iserr
-            out fin if count == 0 and isfin
+            out fin if count == 0 and isfin or iserr and _this.endonerr
         tick ->
             if v == fin
                 if count == 0
@@ -132,17 +142,17 @@ thenstep = (fx, fe) ->
                 wout v, iserr
         undefined
 
-X::then = stepwith thenstep
-X::fail = stepwith (fe) -> thenstep null, fe
+X::then = X::map = stepwith thenstep
+X::fail = X::catch = stepwith (fe) -> thenstep null, fe
 
-X::always = stepwith (fx) -> thenstep fx, (e) -> fx e, true
+X::always = X::finally = X::fin = stepwith (fx) -> thenstep fx, (e) -> fx e, true
 
 X::settle = stepwith (fx, fe) ->
     lastv     = ini
     lastiserr = false
     (v, iserr, out) ->
         if v == fin
-            thenstep(fx, fe)(lastv, lastiserr, out)
+            thenstep(fx, fe) lastv, lastiserr, out
         else
             lastv = v
             lastiserr = iserr
@@ -157,6 +167,33 @@ X::done = (ifx, ife) ->
     stepwith(f).call(this, ifx, ife)
     undefined
 
+
+X::each = X::forEach = stepwith (fx) ->
+    _then = thenstep fx
+    (v, iserr, out) ->
+        if Array.isArray v
+            for x in v
+                _then x, iserr, out
+        else
+            _then v, iserr, out
+
+
+X::serial = stepwith (fx, fe) ->
+    _then = thenstep fx, fe
+    head = next:null
+    tail = head
+    count = 0
+    (v, iserr, out) ->
+        take = ->
+            head = head.next
+            ++count
+            _then head.v, head.iserr, wout
+        wout = (v, iserr) ->
+            --count
+            out v, iserr
+            take() if head.next
+        tail = tail.next = {next:null, v, iserr}
+        take() if count == 0
 
 onesie = (g, f) ->
     -> return if g.called; g.called = 1; f arguments...

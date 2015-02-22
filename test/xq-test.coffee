@@ -72,79 +72,76 @@ describe 'X', ->
 
     describe 'instantiate event emitter', ->
 
-        TYPES.forEach (t) ->
+        it 'is done X.defer(); def.push(); def.end();', (done) ->
+            def = X.defer()
+            later ->
+                r = def.push 1
+                eql r, undefined
+            later -> def.push 2
+            later -> def.push 3
+            later ->
+                r = def.end()
+                eql r, undefined
+            c = 1
+            def.promise.then (v) ->
+                eql v, c++
+                v
+            .settle (v) ->
+                eql v, 3
+                done()
 
-            describe "for #{t.n}", ->
+        it 'is done X.defer(); def.shove(); def.end();', (done) ->
+            def = X.defer()
+            later ->
+                r = def.shove 1
+                eql r, undefined
+            later -> def.shove 2
+            later -> def.shove 3
+            later ->
+                r = def.end()
+                eql r, undefined
+            c = 1
+            def.promise.fail (v) ->
+                eql v, c++
+                throw v
+            .settle null, (v) ->
+                eql v, 3
+                done()
 
-                it 'is done X.defer(); def.push(); def.end();', (done) ->
-                    def = X.defer()
-                    later ->
-                        r = def.push 1
-                        eql r, undefined
-                    later -> def.push 2
-                    later -> def.push 3
-                    later ->
-                        r = def.end()
-                        eql r, undefined
-                    c = 1
-                    def.promise.then (v) ->
-                        eql v, c++
-                        v
-                    .settle (v) ->
-                        eql v, 3
-                        done()
+        it 'is done X.binder (sink, ender) -> sink(v)', (done) ->
+            c = 1
+            X.binder (sink, end) ->
+                later ->
+                    r = sink 1
+                    eql r, undefined
+                later -> sink 2
+                later -> sink 3
+                later ->
+                    r = end()
+                    eql r, undefined
+            .then (v) ->
+                eql v, c++
+                v
+            .settle (v) ->
+                eql v, 3
+                done()
 
-                it 'is done X.defer(); def.shove(); def.end();', (done) ->
-                    def = X.defer()
-                    later ->
-                        r = def.shove 1
-                        eql r, undefined
-                    later -> def.shove 2
-                    later -> def.shove 3
-                    later ->
-                        r = def.end()
-                        eql r, undefined
-                    c = 1
-                    def.promise.fail (v) ->
-                        eql v, c++
-                        throw v
-                    .settle null, (v) ->
-                        eql v, 3
-                        done()
-
-                it 'is done X.binder (sink, ender) -> sink(v)', (done) ->
-                    c = 1
-                    X.binder (sink, end) ->
-                        later ->
-                            r = sink 1
-                            eql r, undefined
-                        later -> sink 2
-                        later -> sink 3
-                        later ->
-                            r = end()
-                            eql r, undefined
-                    .then (v) ->
-                        eql v, c++
-                        v
-                    .settle (v) ->
-                        eql v, 3
-                        done()
-
-                it 'is done X.binder (sink, ender) -> sink(v,true)', (done) ->
-                    c = 1
-                    X.binder (sink, end) ->
-                        later ->
-                            r = sink 1, true
-                            eql r, undefined
-                        later -> sink 2, true
-                        later -> sink 3, true
-                        later -> end()
-                    .fail (v) ->
-                        eql v, c++
-                        v
-                    .settle (v) ->
-                        eql v, 3
-                        done()
+        it 'is done X.binder (sink, ender) -> sink(v,true)', (done) ->
+            c = 1
+            X.binder (sink, end) ->
+                later ->
+                    r = sink 1, true
+                    eql r, undefined
+                later -> sink 2, true
+                later -> sink 3, true
+                later -> end()
+            .fail (v) ->
+                eql v, c++
+                v
+            .settle (v) ->
+                eql v, 3
+                done()
+            .done()
 
     describe 'misc', ->
 
@@ -175,6 +172,11 @@ describe 'X', ->
 
             p.fail (e) ->
                 assert.ok e instanceof TypeError
+                done()
+
+        it 'is ok with X(X(X(42)))', (done) ->
+            X(X(X(42))).then (v) ->
+                eql v, 42
                 done()
 
     describe 'event emitter', ->
@@ -227,7 +229,19 @@ describe 'X', ->
             .done()
             def.push X.resolver (resolve) -> later ->  resolve 42
 
-    describe 'done', ->
+        it 'can emit multiple from inside', (done) ->
+            X([1,2,3]).each (v) ->
+                X.binder (sink, end) ->
+                    sink v + '-' + x for x in [0...v]
+                    end()
+            .settle (v) ->
+                eql v, '3-2'
+                done()
+            .done()
+
+
+
+    describe '.done', ->
 
         lsts = null
 
@@ -277,6 +291,128 @@ describe 'X', ->
                 later -> sink 2, true
                 later -> sink 3, true
             .done()
+
+    describe '.serial', ->
+
+        it 'ensures only one argument is executed at a time', ->
+
+            c = 0
+            X([0,1,2]).each().serial (v) ->
+                c++
+                def = X.defer()
+                later -> def.resolve(v)
+                def.promise
+            .then (v) ->
+                eql c, 1
+                c--
+            .done()
+
+        it 'ensures only one argument is fails at a time', ->
+
+            c = 0
+            X([0,1,2]).each((v) -> throw v).serial null, (v) ->
+                c++
+                def = X.defer()
+                later -> def.resolve(v)
+                def.promise
+            .then (v) ->
+                eql c, 1
+                c--
+            .done()
+
+
+    describe '.each', ->
+
+        it 'turns any incoming array into a series of events', (done) ->
+
+            c = 0
+            X([0,1,2,3,4,5]).each (v) ->
+                eql v, c++
+                done() if v == 5
+            .done()
+
+        it 'does nothing with an empty array', (done) ->
+
+            X([]).each (v) ->
+                done('bad ' + v)
+            .done()
+            done()
+
+        it 'passes non arrays down the chain', (done) ->
+
+            X(42).each (v) ->
+                eql v, 42
+                done()
+            .done()
+
+        it 'no handler is fine', (done) ->
+
+            c = 0
+            X([0,1,2,3]).each().then (v) ->
+                eql v, c++
+                done() if v == 3
+            .done()
+
+        it 'propagates the end', (done) ->
+
+            X([0,1,2]).each().map (v) ->
+                v * 2
+            .settle -> done()
+
+        it 'waits with end until the end', (done) ->
+
+            c = 0
+            p = X().then ->
+                def = X.defer()
+                later -> def.resolve [0,1,2]
+                def.promise
+            p.each f = spy (v) ->
+                eql v, c++
+            .settle ->
+                eql f.callCount, 3
+                done()
+
+        it 'is ok with array of array', (done) ->
+
+            c = 1
+            X([[1,2],[3,4]]).each f = spy ([a,b]) ->
+                eql b, a+1
+            .settle ->
+                eql f.callCount, 2
+                done()
+
+        it 'is aliased to forEach', ->
+
+            eql X::forEach, X::each
+
+    describe '.endOnError', ->
+
+        it 'stops the stream on first error', (done) ->
+
+            X([0,1,2]).each().then((v) -> throw 'fail' if v == 1).endOnError().fail (v) ->
+                eql v, 'fail'
+                done()
+            .done()
+
+        it 'returns itself', ->
+
+            x = X()
+            eql x.endOnError(), x
+
+        it 'stops queued up events', (done) ->
+
+            X([0,1,2]).each().serial().then (v) ->
+                assert.ok v != 2
+                throw 'fail' if v == 1
+                v
+            .endOnError()
+            .fail (e) ->
+                eql e, 'fail'
+            .settle -> done()
+            .done()
+
+
+
 
 ###
 
@@ -683,70 +819,6 @@ describe.skip 'X', ->
                 done()
             .done()
 
-    describe '.forEach', ->
-
-        it 'turns any incoming array into a series of events', (done) ->
-
-            c = 0
-            X([0,1,2,3,4,5]).forEach (v) ->
-                v.should.eql c++
-                done() if v == 5
-            .done()
-
-        it 'does nothing with an empty array', (done) ->
-
-            X([]).forEach (v) ->
-                done('bad ' + v)
-            .done()
-            done()
-
-        it 'passes non arrays down the chain', (done) ->
-
-            X(42).forEach (v) ->
-                v.should.eql 42
-                done()
-            .done()
-
-        it 'no handler is fine', (done) ->
-
-            c = 0
-            X([0,1,2,3]).forEach().then (v) ->
-                v.should.eql c++
-                done() if v == 3
-            .done()
-
-        it 'propagates the end', (done) ->
-
-            X([0,1,2]).forEach().map (v) ->
-                v * 2
-            .onEnd -> done()
-
-        it 'waits with end until the end', (done) ->
-
-            c = 0
-            p = X().then ->
-                def = X.defer()
-                later -> def.resolve [0,1,2]
-                def.promise
-            p.forEach f = spy (v) ->
-                v.should.eql c++
-            .onEnd ->
-                f.should.have.been.calledThrice
-                done()
-
-        it 'is ok with array of array', (done) ->
-
-            c = 1
-            X([[1,2],[3,4]]).each f = spy ([a,b]) ->
-                b.should.eql a + 1
-            .onEnd ->
-                f.callCount.should.eql 2
-                done()
-
-        it 'is aliased to each', ->
-
-            X::forEach.should.equal X::each
-
     describe '.singly', ->
 
         it 'turns any incoming array into a series of events, serially', (done) ->
@@ -830,7 +902,7 @@ describe.skip 'X', ->
             innerEnd = null
             c = 0
             X.binder (sink, end) ->
-                X(Q([0,1,2])).forEach().then(sink).onEnd innerEnd = spy -> end()
+                X(Q([0,1,2])).each().then(sink).onEnd innerEnd = spy -> end()
             .then f = spy (v) ->
                 v.should.eql c++
             .onEnd ->
@@ -859,7 +931,7 @@ describe.skip 'X', ->
 
         it 'receives the last value', (done) ->
 
-            X([1,2,3]).forEach().onEnd (v, isError) ->
+            X([1,2,3]).each().onEnd (v, isError) ->
                 v.should.eql 3
                 isError.should.eql false
                 done()
@@ -867,7 +939,7 @@ describe.skip 'X', ->
 
         it 'receives the last error', (done) ->
 
-            X([1,2,3]).forEach (v) ->
+            X([1,2,3]).each (v) ->
                 throw v
             .onEnd (v, isError) ->
                 v.should.eql 3
@@ -899,7 +971,7 @@ describe.skip 'X', ->
         it 'releases the original value if step function is true', (done) ->
 
             c = 1
-            X([0,1,2,3]).forEach().filter (v) ->
+            X([0,1,2,3]).each().filter (v) ->
                 v % 2 == 1
             .then (v) ->
                 v.should.eql c
@@ -911,7 +983,7 @@ describe.skip 'X', ->
 
             n = 0
             ref = [1, 'a', true, {}]
-            X([0,1,'','a',false,true,undefined,{}]).forEach().filter (v) ->
+            X([0,1,'','a',false,true,undefined,{}]).each().filter (v) ->
                 v
             .then (v) ->
                 v.should.eql ref[n++]
@@ -922,7 +994,7 @@ describe.skip 'X', ->
 
             n = 0
             ref = [1, 'a', true, {}]
-            X([0,1,'','a',false,true,undefined,{}]).forEach().filter (v) ->
+            X([0,1,'','a',false,true,undefined,{}]).each().filter (v) ->
                 def = X.defer()
                 later -> def.resolve(v)
                 def.promise
@@ -950,13 +1022,13 @@ describe.skip 'X', ->
 
         it 'propagates end with no value released', (done) ->
 
-            X([0,1,2]).forEach().filter ->
+            X([0,1,2]).each().filter ->
                 false
             .onEnd -> done()
 
         it 'propagates end with value released', (done) ->
 
-            X([0,1,2]).forEach().filter (v) ->
+            X([0,1,2]).each().filter (v) ->
                 v == 1
             .onEnd -> done()
 
@@ -1041,7 +1113,7 @@ describe.skip 'X', ->
             c = 0
             p = X(def.promise).map (v) ->
                 v
-            .forEach().map (a) ->
+            .each().map (a) ->
                 a * 2
             p.then (v) ->
                 v.should.eql c
@@ -1049,29 +1121,6 @@ describe.skip 'X', ->
             .done()
             p.onEnd -> done()
             later -> def.resolve [0,1,2]
-
-    describe '.endOnError', ->
-
-        it 'stops the stream on first error', (done) ->
-
-            X([0,1,2]).forEach().then((v) -> throw 'fail' if v == 1).endOnError().fail (v) ->
-                v.should.eql 'fail'
-                done()
-            .done()
-
-        it 'returns itself', ->
-
-            x = X()
-            x.should.equal x.endOnError()
-
-        it 'stops queued up events', (done) ->
-
-            X([0,1,2]).forEach().serial().then (v) ->
-                v.should.not.eql 2
-                throw 'fail' if v == 1
-                v
-            .endOnError()
-            .onEnd -> done()
 
     describe '.all', ->
 
@@ -1279,37 +1328,6 @@ describe.skip 'X', ->
                 done()
             .done()
 
-    describe '.serial', ->
-
-        it 'ensures only one argument is executed at a time', ->
-
-            c = 0
-            X([0,1,2]).forEach().serial (v) ->
-                c++
-                def = X.defer()
-                later ->
-                    def.resolve(v)
-                def.promise
-            .then (v) ->
-                c.should.eql 1
-                c--
-            .done()
-
-        it 'ensures only one argument is fails at a time', ->
-
-            c = 0
-            X([0,1,2]).forEach((v) -> throw v).serial null, (v) ->
-                c++
-                def = X.defer()
-                later ->
-                    def.resolve(v)
-                def.promise
-            .then (v) ->
-                c.should.eql 1
-                c--
-            .done()
-
-
     describe 'special promise a+ investigation', ->
 
         it 'is special', (done) ->
@@ -1439,7 +1457,7 @@ describe.skip 'X', ->
 
         it 'waits to the end of the stream and releases the last value', (done) ->
 
-            X([0,1,2]).forEach().settle (v) ->
+            X([0,1,2]).each().settle (v) ->
                 v.should.eql(2)
                 done()
             .done()
@@ -1469,14 +1487,14 @@ describe.skip 'X', ->
             later -> def.end()
 
         it 'obviously settles only once for streams', ->
-            X([0,1,2]).forEach().settle()
+            X([0,1,2]).each().settle()
 
         it 'obviously settles only once for promises', ->
             X(1).settle()
 
         it 'releases undefined if no value before stream end', ->
 
-            X([0,1]).forEach().filter(->false).settle()
+            X([0,1]).each().filter(->false).settle()
 
     describe '.oi', ->
 

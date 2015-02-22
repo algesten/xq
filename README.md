@@ -127,8 +127,8 @@ chain. Read [about OI](oi.md).
 
 * **X(v)** creates an instance resolved with value `v`. Equivalent to
   `def.push(v); def.end()`.
-* **X.reject(v)** creates an instance that is rejected with value
-  `v`. Equivalent to `def.pushError(v); def.end()`.
+* **X.reject(e)** creates an instance that is rejected with value
+  `e`. Equivalent to `def.shove(e); def.end()`.
 * **X.resolver(f)** `f` is synchronously called with `resolve, reject` which are functions
   used to resolve/reject the promise. `X.resolve((resolve, reject) -> ... resolve(42))`
 * **X.binder(f)** `f` is synchronously called with `sink`, `end` The
@@ -141,7 +141,8 @@ chain. Read [about OI](oi.md).
 * **def.resolve(v)** to resolve the deferred with value `v`.
 * **def.reject(e)** to reject the deferred with reason `e`.
 * **def.push(v)** to push a value down the chain.
-* **def.pushError(e)** to push an error down the chain.
+* **def.shove(e)/pushError(e)** to shove an error down the
+  chain. Aliased to `pushError`.
 * **p = def.promise** to get the promise from the deferred.
 
 ### State
@@ -152,6 +153,7 @@ chain. Read [about OI](oi.md).
 * **p.isRejected()** tells whether the promise is rejected.
 * **p.endOnError()** makes stream stop on first encountered
   error. Returns self.
+* **p.stop()** stop stream immediately.
 
 ### Chaining
 
