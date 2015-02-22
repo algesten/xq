@@ -53,7 +53,7 @@ def.resolve 21
 Looping over an array.
 
 ```coffeescript
-X([1,2,3,4]).forEach(v) ->
+X([1,2,3,4]).each(v) ->
   X(v * 2)
 .then (v) ->
   console.log v
@@ -150,11 +150,8 @@ chain. Read [about OI](oi.md).
 * **p.isPending()** tells whether the promise is pending. Equivalent to `!p.isEnded()`.
 * **p.isFulfilled()** tells whether the promise is resolved.
 * **p.isRejected()** tells whether the promise is rejected.
-* **p.onEnd(f)** will call `f` when stream is ended. Returns self.
 * **p.endOnError()** makes stream stop on first encountered
   error. Returns self.
-* **p.stop()** Immediately stops the stream. After this `isEnded()`
-  will be true. Returns self.
 
 ### Chaining
 
@@ -177,14 +174,14 @@ chain. Read [about OI](oi.md).
 
 ### Arrays and Objects
 
-* **p.forEach/each(fx)** attached `fx` to receive values. If the value is
+* **p.each/forEach(fx)** attached `fx` to receive values. If the value is
   an array, it will invoke `fx` one by one. I.e. `[a0,a1,a2]` will
   invoke `fx(a0)`, `fx(a1)`, `fx(a2)`
-* **p.singly/oneByOne(fx)** serialized version of `forEach`. Each
+* **p.singly/oneByOne(fx)** serialized version of `each`. Each
   value in the array is fed to the function only when the last value
   is finished. This mainly makes a difference for deferreds. See
   section explaining
-  [forEach and singly](#foreach-has-a-serial-pitfall).
+  [each and singly](#foreach-has-a-serial-pitfall).
 * **p.spread(fx)** attaches `fx` to receive values. If the value is an
   array, the array will be destructured to arguments in
   `fx`. I.e. `[a0,a1,a2]` will invoke `fx(a0, a1, a2)`. Non-array
@@ -229,7 +226,7 @@ noticable.
 The result of this operation will come out in the order of the array.
 
 ```coffeescript
-X([0,1,2]).forEach (v) -> v*2
+X([0,1,2]).each (v) -> v*2
 ```
 
 There is however one situation with `endOnError` where it may
@@ -238,7 +235,7 @@ matter. A somewhat contrived example.
 ```coffeescript
 # This doesn't work as expected!!!
 
-X([0,1,2]).forEach (v) ->
+X([0,1,2]).each (v) ->
     throw new Error('fail') if v == 1
 .endOnError()
 .then (v) ->
@@ -246,8 +243,8 @@ X([0,1,2]).forEach (v) ->
 ```
 
 The user may expect the last `.then` to never receive the 2. However
-since all values are fed into `forEach` in parallel, the error will
-happen too late to stop the 2. To fix this use `forEach().serial()`.
+since all values are fed into `each` in parallel, the error will
+happen too late to stop the 2. To fix this use `singly()`.
 
 ### Parallel deferreds
 
@@ -257,16 +254,16 @@ When using deferreds the order is not guaranteed.
 url1 = 'http://www.google.com/'
 url2 = 'http://github.com/'
 url3 = 'http://www.reddit.com/'
-X([url1,url2,url3]).forEach(doRequest) # returns a promise for result
+X([url1,url2,url3]).each(doRequest) # returns a promise for result
 .map (result) ->
   # ... ?
   ```
 
 Depending on how slow the requests were, the `.map` operation will
-receive the result in any order. To fix it, we can use
-`forEach().serial()` which ensures that each url fed to doRequest will
-return a fulfilled promise before the result is passed on to
-`.map`. This however means each requests will run serially.
+receive the result in any order. To fix it, we can use `singly()`
+which ensures that each url fed to doRequest will return a fulfilled
+promise before the result is passed on to `.map`. This however means
+each requests will run serially.
 
 ### Strategy for unwrapping deferreds
 
@@ -290,36 +287,36 @@ If we break down this sequence.
    exit of that same `.then`-step is unwrapped again back to `42`
 6. The last `.then`-step is therefore also just fed `42`.
 
-### forEach has a serial pitfall
+### each has a serial pitfall
 
-When using `forEach` in combination with arrays of promises, there is
-a potential pitfall. `forEach` is also parallel and does not wait for
+When using `each` in combination with arrays of promises, there is
+a potential pitfall. `each` is also parallel and does not wait for
 one deferred to finish before feeding the next, which means the
 following code would execute `doSomething` in parallell for the values
 of the array.
 
 ```coffeescript
-# forEach does not work serially!
+# each does not work serially!
 p1 = makePromise()
 p2 = makePromise()
 p3 = makePromise()
 
-X([p1,p2,p3]).forEach (p) -> p.then(doSomething)...
+X([p1,p2,p3]).each (p) -> p.then(doSomething)...
 ```
 
-#### forEach().serial() is not serial
+#### each().serial() is not serial
 
 A mistaken attempt at fixing this would be to use `serial`, as in
-`.forEach().serial (p) ->...` but this does not work. Having no
-function to `forEach` would be the equivalent to `(x) -> x` and any
-deferred would be unwrapped on the exit of that `forEach`-step. This
+`.each().serial (p) ->...` but this does not work. Having no
+function to `each` would be the equivalent to `(x) -> x` and any
+deferred would be unwrapped on the exit of that `each`-step. This
 means all deferred have been unwrapped in parallel already before the
 invocation of `.serial()`.
 
 #### singly() does things serially.
 
 `.singly()` (or alias `.oneByOne()`)is a serialized version of
-`.forEach()`.
+`.each()`.
 
 ```coffeescript
 # singly is serial
