@@ -1,6 +1,3 @@
-UNSTABLE PROJECT - UNCERTAIN IT WORKS
-=====================================
-
 XQ - Reactive Promises
 ======================
 
