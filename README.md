@@ -1,3 +1,6 @@
+
+I WOULDN'T USE THIS. IT'S NOT A GOOD CODE BASE NOR A GOOD IDEA.
+
 XQ - Reactive Promises
 ======================
 
